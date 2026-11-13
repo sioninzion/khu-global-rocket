@@ -74,6 +74,35 @@ export class Sfx {
     this.dr.o2.frequency.setTargetAtTime(57 - 22 * x, t, 0.2);
     this.dr.f.frequency.setTargetAtTime(180 + 260 * x, t, 0.2);
   }
+  // laser beam: a buzzing electric hum with a fast wobble and a crackle on top
+  beam(on) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if (on && !this.bm) {
+      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), lfo = ctx.createOscillator();
+      o1.type = 'sawtooth'; o1.frequency.value = 118;
+      o2.type = 'square'; o2.frequency.value = 236.7;
+      lfo.type = 'sine'; lfo.frequency.value = 31;
+      const lfoG = ctx.createGain(); lfoG.gain.value = 0.35;
+      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 0.8;
+      const crackle = ctx.createBufferSource(); crackle.buffer = this.noise; crackle.loop = true;
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3500;
+      const cg = ctx.createGain(); cg.gain.value = 0.08;
+      const amp = ctx.createGain(); amp.gain.value = 0.65;
+      const g = ctx.createGain(); g.gain.value = 0.0001;
+      o1.connect(f); o2.connect(f); f.connect(amp);
+      lfo.connect(lfoG).connect(amp.gain);
+      crackle.connect(hp).connect(cg).connect(amp);
+      amp.connect(g).connect(this.master);
+      o1.start(); o2.start(); lfo.start(); crackle.start();
+      g.gain.setTargetAtTime(0.22, t, 0.03);
+      this.bm = { o1, o2, lfo, crackle, g };
+    } else if (!on && this.bm) {
+      const b = this.bm; this.bm = null;
+      b.g.gain.setTargetAtTime(0.0001, t, 0.04);
+      for (const n of [b.o1, b.o2, b.lfo, b.crackle]) n.stop(t + 0.3);
+    }
+  }
   toggleMute() {
     this.muted = !this.muted;
     if (this.master) this.master.gain.value = this.muted ? 0 : 0.7;

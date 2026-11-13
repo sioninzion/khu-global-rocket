@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { NIGHT } from './facade.js?v=46';
-import { City } from './buildings.js?v=46';
-import { buildStructures } from './models.js?v=46';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=46';
-import { Particles, Debris } from './fx.js?v=46';
-import { Input } from './input.js?v=46';
-import { Sfx } from './audio.js?v=46';
+import { NIGHT } from './facade.js?v=48';
+import { City } from './buildings.js?v=48';
+import { buildStructures } from './models.js?v=48';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=48';
+import { Particles, Debris } from './fx.js?v=48';
+import { Input } from './input.js?v=48';
+import { Sfx } from './audio.js?v=48';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -34,7 +34,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=46')).json();
+  const data = await (await fetch('data/campus.json?v=48')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -585,6 +585,7 @@ async function main() {
   function updateBeam(dt) {
     const on = S.mode === 'flight' && S.weapon === 'laser' && S.firing;
     lzGroup.visible = on;
+    sfx.beam(on && !S.paused);
     if (!on) { lzTick = 0; return; }
     computeFwd();
     const o = tmp.copy(S.pos).addScaledVector(fwd, 2.6);
@@ -1452,6 +1453,7 @@ async function main() {
   window.__game.unlock = (w = 'ballistic') => { S.score = Math.max(S.score, UNLOCKS[w]); checkUnlocks(); return 'ok'; };
   window.__game.bombs = bombs;
   window.__game.hunters = hunters;
+  window.__game.sfx = sfx;
   window.__game.pick = (w) => pickWeapon(w);
   window.__game.find = (name) => { const s = city.structures.find(q => q.name === name); const b = s.parts[0]; return [(b.minx + b.maxx) / 2, b.base, (b.minz + b.maxz) / 2, b.ytop - b.base]; };
   window.__game.step = (n = 1, dt = 1 / 60, render = true) => { for (let i = 0; i < n; i++) update(dt); if (render) { drawMini(1); renderFrame(); } return S.mode; };
@@ -1529,7 +1531,7 @@ async function main() {
   const openSettings = (open) => {
     $('settings').classList.toggle('open', open);
     S.paused = open;
-    if (open) { input.resetJoy(); input.boostIds.clear(); input.keys.clear(); $('boostBtn').classList.remove('on'); sfx.engine(false); }
+    if (open) { input.resetJoy(); input.boostIds.clear(); input.keys.clear(); $('boostBtn').classList.remove('on'); sfx.engine(false); sfx.beam(false); }
   };
   $('btnSettings').addEventListener('click', () => openSettings(true));
   $('optClose').addEventListener('click', () => openSettings(false));
