@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d1420">
+<title>경희대 국제캠 로켓</title>
+<meta property="og:title" content="경희대 국제캠 로켓">
+<meta property="og:description" content="정문에서 로켓을 쏴서 국제캠퍼스 건물을 부숴보세요!">
+<style>
+  :root { --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px); --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1420; color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; touch-action: none; }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #touch { position: fixed; inset: 0; z-index: 2; touch-action: none; display: none; }
+  body.playing #touch { display: block; }
+  .hud { position: fixed; z-index: 3; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+  #stats { top: calc(10px + var(--safe-t)); left: calc(12px + var(--safe-l)); display: flex; gap: 14px; font-size: 13px; }
+  #stats b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  #stats small { opacity: .75; }
+  #flight { bottom: calc(14px + var(--safe-b)); left: 50%; transform: translateX(-50%); display: flex; gap: 18px; font-size: 12px; opacity: .9; }
+  #flight b { font-size: 18px; font-variant-numeric: tabular-nums; }
+  #mini { top: calc(10px + var(--safe-t)); right: calc(10px + var(--safe-r)); width: 150px; height: 150px; border-radius: 12px;
+    border: 2px solid rgba(255,255,255,.5); box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+  #center { top: 38%; left: 50%; transform: translate(-50%, -50%); font-size: 96px; font-weight: 800; }
+  #toast { top: 22%; left: 50%; transform: translate(-50%, -8px); font-size: 18px; font-weight: 700; padding: 10px 18px;
+    background: rgba(0,0,0,.45); border-radius: 999px; opacity: 0; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
+  #toast.big { font-size: 22px; background: rgba(200,32,47,.75); }
+  #toast.show { animation: toast 2.6s ease forwards; }
+  @keyframes toast { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.9); } 10% { opacity: 1; transform: translate(-50%, 0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -10px); } }
+  #joyBase { position: fixed; z-index: 3; left: calc(110px + var(--safe-l)); bottom: calc(50px + var(--safe-b)); width: 130px; height: 130px;
+    margin-left: -65px; border-radius: 50%; border: 2px solid rgba(255,255,255,.45); background: rgba(255,255,255,.12); pointer-events: none; display: none; }
+  body.playing #joyBase { display: block; }
+  #joyBase.on { margin: -65px 0 0 -65px; background: rgba(255,255,255,.18); }
+  #joyKnob { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; border-radius: 50%; background: rgba(255,255,255,.85);
+    transform: translate(-50%, -50%); box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+  #boostWrap { position: fixed; z-index: 3; right: calc(36px + var(--safe-r)); bottom: calc(40px + var(--safe-b)); pointer-events: none; display: none; text-align: center; }
+  body.playing #boostWrap { display: block; }
+  #boostBtn { width: 118px; height: 118px; border-radius: 50%; display: grid; place-items: center; font-size: 17px; font-weight: 800; letter-spacing: 1px;
+    background: radial-gradient(circle at 50% 35%, #ff9f43, #e2442f 70%); border: 3px solid rgba(255,255,255,.75); box-shadow: 0 6px 18px rgba(226,68,47,.45);
+    transition: transform .06s; }
+  #boostBtn.on { transform: scale(.92); background: radial-gradient(circle at 50% 35%, #ffd36b, #ff6a2f 70%); box-shadow: 0 0 30px rgba(255,160,60,.9); }
+  #boostBtn.empty { filter: grayscale(.8) brightness(.7); }
+  #boostBar { width: 118px; height: 8px; margin-top: 8px; border-radius: 4px; background: rgba(0,0,0,.4); overflow: hidden; }
+  #boostFill { width: 100%; height: 100%; background: linear-gradient(90deg, #ffb347, #ff5e3a); transform-origin: left; }
+  #btns { position: fixed; z-index: 4; top: calc(66px + var(--safe-t)); left: calc(10px + var(--safe-l)); display: none; gap: 8px; }
+  body.playing #btns { display: flex; }
+  #btns button { pointer-events: auto; font: inherit; font-size: 13px; color: #fff; background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.35);
+    border-radius: 10px; padding: 7px 10px; }
+  #btns button.on { background: rgba(255,200,60,.45); }
+  #portrait { position: fixed; z-index: 3; left: 50%; bottom: calc(190px + var(--safe-b)); transform: translateX(-50%); font-size: 12px;
+    background: rgba(0,0,0,.45); padding: 6px 12px; border-radius: 999px; display: none; pointer-events: none; white-space: nowrap; }
+  body.playing #portrait.show { display: block; }
+  #title { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; text-align: center; padding: 20px;
+    background: linear-gradient(180deg, rgba(13,20,32,.55), rgba(13,20,32,.9)); transition: opacity .4s; }
+  #title.hide { opacity: 0; pointer-events: none; }
+  #title h1 { margin: 0 0 6px; font-size: clamp(28px, 7vw, 48px); letter-spacing: -1px; }
+  #title h1 span { color: #ff6a4d; }
+  #title p { margin: 4px 0; opacity: .85; font-size: 14px; }
+  #start { margin-top: 18px; font: inherit; font-size: 20px; font-weight: 800; color: #fff; border: 0; border-radius: 999px; padding: 14px 40px;
+    background: linear-gradient(180deg, #ff7a50, #d93a2b); box-shadow: 0 8px 24px rgba(217,58,43,.45); }
+  #start:disabled { opacity: .5; }
+  #loadMsg { margin-top: 12px; font-size: 12px; opacity: .7; }
+  .howto { display: flex; gap: 22px; justify-content: center; margin-top: 14px; font-size: 13px; }
+  .howto div { background: rgba(255,255,255,.08); border-radius: 12px; padding: 10px 14px; }
+  #credit { position: fixed; z-index: 3; left: calc(8px + var(--safe-l)); bottom: calc(4px + var(--safe-b)); font-size: 9px; opacity: .55; pointer-events: none; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="touch"></div>
+
+<div id="stats" class="hud">
+  <div><small>파괴 조각</small><b id="score">0</b></div>
+  <div><small>붕괴 건물</small><b id="down">0</b></div>
+  <div><small>발사</small><b id="shots">0</b></div>
+</div>
+<canvas id="mini" class="hud"></canvas>
+<div id="flight" class="hud">
+  <div>속도 <b id="speed">0</b> km/h</div>
+  <div>고도 <b id="alt">0</b> m</div>
+</div>
+<div id="center" class="hud"></div>
+<div id="toast" class="hud"></div>
+<div id="portrait">📱 가로로 돌리면 더 넓게 보여요</div>
+
+<div id="joyBase"><div id="joyKnob"></div></div>
+<div id="boostWrap"><div id="boostBtn">BOOST</div><div id="boostBar"><div id="boostFill"></div></div></div>
+<div id="btns">
+  <button id="btnInvert" title="상하 반전">↕ 반전</button>
+  <button id="btnMute">🔊</button>
+  <button id="btnReset" title="캠퍼스 복구">🔄</button>
+</div>
+<div id="credit">지도 © OpenStreetMap contributors · 지형 Mapzen/AWS Terrain Tiles</div>
+
+<div id="title">
+  <div>
+    <h1>경희대 국제캠 <span>로켓</span></h1>
+    <p>정문에서 발사된 로켓을 조종해서 캠퍼스 건물에 들이박으세요!</p>
+    <div class="howto">
+      <div>👈 왼쪽 드래그<br><b>조종</b></div>
+      <div>👉 오른쪽 누르기<br><b>부스트</b></div>
+    </div>
+    <button id="start" disabled>불러오는 중…</button>
+    <div id="loadMsg">준비 중…</div>
+  </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
