@@ -74,33 +74,46 @@ export class Sfx {
     this.dr.o2.frequency.setTargetAtTime(57 - 22 * x, t, 0.2);
     this.dr.f.frequency.setTargetAtTime(180 + 260 * x, t, 0.2);
   }
-  // laser beam: a buzzing electric hum with a fast wobble and a crackle on top
+  // laser beam, repulsor-style: a quick rising charge-up whine with a punchy thump,
+  // then a bright airy energy stream (high tones with vibrato over a hissing whoosh), and a falling tail on release
   beam(on) {
     if (!this.ctx) return;
     const ctx = this.ctx, t = ctx.currentTime;
     if (on && !this.bm) {
-      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), lfo = ctx.createOscillator();
-      o1.type = 'sawtooth'; o1.frequency.value = 118;
-      o2.type = 'square'; o2.frequency.value = 236.7;
-      lfo.type = 'sine'; lfo.frequency.value = 31;
-      const lfoG = ctx.createGain(); lfoG.gain.value = 0.35;
-      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 0.8;
-      const crackle = ctx.createBufferSource(); crackle.buffer = this.noise; crackle.loop = true;
-      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3500;
-      const cg = ctx.createGain(); cg.gain.value = 0.08;
-      const amp = ctx.createGain(); amp.gain.value = 0.65;
-      const g = ctx.createGain(); g.gain.value = 0.0001;
-      o1.connect(f); o2.connect(f); f.connect(amp);
-      lfo.connect(lfoG).connect(amp.gain);
-      crackle.connect(hp).connect(cg).connect(amp);
-      amp.connect(g).connect(this.master);
-      o1.start(); o2.start(); lfo.start(); crackle.start();
-      g.gain.setTargetAtTime(0.22, t, 0.03);
-      this.bm = { o1, o2, lfo, crackle, g };
+      const out = ctx.createGain(); out.gain.value = 0.0001; out.connect(this.master);
+      // charge-up whine
+      const ch = ctx.createOscillator(); ch.type = 'sine';
+      ch.frequency.setValueAtTime(320, t); ch.frequency.exponentialRampToValueAtTime(1900, t + 0.22);
+      const chg = ctx.createGain(); chg.gain.setValueAtTime(0.0001, t); chg.gain.exponentialRampToValueAtTime(0.35, t + 0.05); chg.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      ch.connect(chg).connect(this.master); ch.start(t); ch.stop(t + 0.32);
+      // punch
+      const th = ctx.createOscillator(); th.type = 'sine';
+      th.frequency.setValueAtTime(140, t + 0.12); th.frequency.exponentialRampToValueAtTime(45, t + 0.4);
+      const thg = ctx.createGain(); thg.gain.setValueAtTime(0.0001, t); thg.gain.setValueAtTime(0.0001, t + 0.12); thg.gain.exponentialRampToValueAtTime(0.5, t + 0.14); thg.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+      th.connect(thg).connect(this.master); th.start(t); th.stop(t + 0.5);
+      // sustained energy stream
+      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), o3 = ctx.createOscillator();
+      o1.type = 'sine'; o1.frequency.value = 880; o2.type = 'triangle'; o2.frequency.value = 1322; o3.type = 'sine'; o3.frequency.value = 1763;
+      const vib = ctx.createOscillator(); vib.frequency.value = 7.5; const vibG = ctx.createGain(); vibG.gain.value = 18;
+      vib.connect(vibG); vibG.connect(o1.frequency); vibG.connect(o2.frequency); vibG.connect(o3.frequency);
+      const tone = ctx.createGain(); tone.gain.value = 0.16;
+      o1.connect(tone); o2.connect(tone); o3.connect(tone);
+      const hiss = ctx.createBufferSource(); hiss.buffer = this.noise; hiss.loop = true;
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 1.2;
+      const sw = ctx.createOscillator(); sw.frequency.value = 3.2; const swG = ctx.createGain(); swG.gain.value = 900;
+      sw.connect(swG).connect(bp.frequency);
+      const hg = ctx.createGain(); hg.gain.value = 0.5;
+      hiss.connect(bp).connect(hg);
+      tone.connect(out); hg.connect(out);
+      for (const n of [o1, o2, o3, vib, hiss, sw]) n.start(t + 0.12);
+      out.gain.setValueAtTime(0.0001, t + 0.12); out.gain.exponentialRampToValueAtTime(0.42, t + 0.2);
+      this.bm = { nodes: [o1, o2, o3, vib, hiss, sw], out, o1, o2, o3 };
     } else if (!on && this.bm) {
       const b = this.bm; this.bm = null;
-      b.g.gain.setTargetAtTime(0.0001, t, 0.04);
-      for (const n of [b.o1, b.o2, b.lfo, b.crackle]) n.stop(t + 0.3);
+      // falling tail
+      for (const o of [b.o1, b.o2, b.o3]) o.frequency.setTargetAtTime(o.frequency.value * 0.45, t, 0.08);
+      b.out.gain.cancelScheduledValues(t); b.out.gain.setValueAtTime(b.out.gain.value || 0.42, t); b.out.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+      for (const n of b.nodes) n.stop(t + 0.32);
     }
   }
   toggleMute() {
