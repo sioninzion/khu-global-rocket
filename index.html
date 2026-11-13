@@ -182,6 +182,7 @@
   /* portrait: smaller minimap, weapon slots stacked down the right edge */
   @media (max-aspect-ratio: 1/1) {
     #mini { width: 104px; height: 104px; }
+    #flight { top: calc(100px + var(--safe-t)); bottom: auto; left: calc(10px + var(--safe-l)); transform: none; }
     #btnSettings { right: calc(124px + var(--safe-r)); }
     #weapons { top: calc(124px + var(--safe-t)); bottom: auto; left: auto; right: calc(6px + var(--safe-r)); transform: none;
       flex-direction: column; flex-wrap: nowrap; width: auto; max-width: none; gap: 3px; padding: 4px; }
@@ -265,6 +266,6 @@
   </div>
 </div>
 
-<script type="module" src="src/main.js?v=44"></script>
+<script type="module" src="src/main.js?v=45"></script>
 </body>
 </html>

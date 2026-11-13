@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { NIGHT } from './facade.js?v=44';
-import { City } from './buildings.js?v=44';
-import { buildStructures } from './models.js?v=44';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=44';
-import { Particles, Debris } from './fx.js?v=44';
-import { Input } from './input.js?v=44';
-import { Sfx } from './audio.js?v=44';
+import { NIGHT } from './facade.js?v=45';
+import { City } from './buildings.js?v=45';
+import { buildStructures } from './models.js?v=45';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=45';
+import { Particles, Debris } from './fx.js?v=45';
+import { Input } from './input.js?v=45';
+import { Sfx } from './audio.js?v=45';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -34,7 +34,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=44')).json();
+  const data = await (await fetch('data/campus.json?v=45')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -1431,6 +1431,12 @@ async function main() {
   }
 
   // ------------------------------------------------------------ resize / loop
+  let wasPortrait = false, hintTimer = 0;
+  function showPortraitHint() {
+    $('portrait').classList.add('show');
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => $('portrait').classList.remove('show'), 3000);
+  }
   function resize() {
     const w = innerWidth, h = innerHeight;
     renderer.setSize(w, h, false);
@@ -1440,7 +1446,11 @@ async function main() {
     camera.updateProjectionMatrix();
     const s = h * renderer.getPixelRatio() / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
     fire.setScale(s); smoke.setScale(s);
-    $('portrait').classList.toggle('show', w < h);
+    // the "turn sideways" hint shows for 3 s whenever the game is (or becomes) portrait while playing
+    const portrait = w < h;
+    if (portrait && !wasPortrait && document.body.classList.contains('playing')) showPortraitHint();
+    if (!portrait) $('portrait').classList.remove('show');
+    wasPortrait = portrait;
   }
   addEventListener('resize', resize);
   resize();
@@ -1555,6 +1565,7 @@ async function main() {
     }
     $('title').classList.add('hide');
     document.body.classList.add('playing');
+    if (innerWidth < innerHeight) { wasPortrait = true; showPortraitHint(); }
     resetRocket();
   });
 }
