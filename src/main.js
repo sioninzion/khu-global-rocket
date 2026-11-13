@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { NIGHT } from './facade.js?v=54';
-import { City } from './buildings.js?v=54';
-import { buildStructures } from './models.js?v=54';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=54';
-import { Particles, Debris } from './fx.js?v=54';
-import { Input } from './input.js?v=54';
-import { Sfx } from './audio.js?v=54';
+import { NIGHT } from './facade.js?v=55';
+import { City } from './buildings.js?v=55';
+import { buildStructures } from './models.js?v=55';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=55';
+import { Particles, Debris } from './fx.js?v=55';
+import { Input } from './input.js?v=55';
+import { Sfx } from './audio.js?v=55';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -34,7 +34,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=54')).json();
+  const data = await (await fetch('data/campus.json?v=55')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -644,40 +644,50 @@ async function main() {
   const aimDead = (a) => !a || (a.b && !a.b.alive[a.c]);
   // keep each warhead on something that is still standing: same building if possible, otherwise a new target
   function reaim(h) {
-    let a = h.st.parts.some(b => b.aliveCount > 0) ? aimPoint(h.st) : null;
+    let a = h.st && h.st.parts.some(b => b.aliveCount > 0) ? aimPoint(h.st) : null;
     if (!a) {
       const tg = pickTarget();
-      if (tg) { h.st = tg.st; a = aimPoint(tg.st); }
+      if (tg.st) { h.st = tg.st; a = aimPoint(tg.st); }
+      else if (!h.st) return; // already on a random ground point: keep it
+      else { h.st = null; a = tg.point; }
     }
     if (a) h.aim = a;
+  }
+  // nothing left anywhere: a random spot on the ground ahead
+  function randomGroundPoint() {
+    const ang = S.yaw + (Math.random() - 0.5) * 2 * H_HALF, d = 120 + Math.random() * 500;
+    let x = S.pos.x + Math.sin(ang) * d, z = S.pos.z - Math.cos(ang) * d;
+    x = Math.min(terrain.x1 - 20, Math.max(terrain.x0 + 20, x)); z = Math.min(terrain.z1 - 20, Math.max(terrain.z0 + 20, z));
+    return new THREE.Vector3(x, terrain.height(x, z) + 0.5, z);
   }
   function pickTarget() {
     const hx = Math.sin(S.yaw), hz = -Math.cos(S.yaw);
     const inCone = [];
-    let nearest = null, nd = Infinity;
+    let nearest = null, nd = Infinity, nearestAny = null, na = Infinity;
     for (const st of city.structures) {
       const c = structCenter(st);
       if (!c) continue;
-      if (st.parts.reduce((t, b) => t + b.aliveCount, 0) < st.total * 0.08) continue; // already mostly destroyed
       const dx = c[0] - S.pos.x, dz = c[1] - S.pos.z, d = Math.hypot(dx, dz);
+      if (d < na) { na = d; nearestAny = st; } // any building with at least one chunk left
+      if (st.parts.reduce((t, b) => t + b.aliveCount, 0) < st.total * 0.08) continue; // already mostly destroyed
       if (d < nd && d > 30) { nd = d; nearest = st; }
       if (d < H_MIN || d > H_MAXD) continue;
       if (Math.acos(Math.max(-1, Math.min(1, (dx * hx + dz * hz) / d))) <= H_HALF) inCone.push(st);
     }
     if (inCone.length) return { st: inCone[Math.floor(Math.random() * inCone.length)], climb: 50 };
-    return nearest ? { st: nearest, climb: 70, fallback: true } : null;
+    if (nearest) return { st: nearest, climb: 70, fallback: true };
+    // only scraps left: still chase the nearest surviving chunks; 100% destroyed: random ground point
+    if (nearestAny) return { st: nearestAny, climb: 70, fallback: true };
+    return { st: null, point: randomGroundPoint(), climb: 50 };
   }
   // one press: a salvo of H_PER_SHOT warheads, H_GAP seconds apart (alternating left/right)
   function fireHunter() {
-    const tg = pickTarget();
-    if (!tg) return;
     S.hCharges -= 1;
     if (!(S.hQueue > 0)) S.hQTimer = 0;
     S.hQueue = (S.hQueue || 0) + H_PER_SHOT;
   }
   function launchWarhead(k) {
     const tg = pickTarget();
-    if (!tg) { S.hQueue = 0; return; }
     computeFwd();
     const right = new THREE.Vector3(-fwd.z, 0, fwd.x).normalize();
     const side = 0;
@@ -691,7 +701,7 @@ async function main() {
     const cs = k % 2 ? 2 : 1;
     hunters.push({ mesh, p, v: new THREE.Vector3(fwd.x * 8 + Math.cos(sa) * sm, (6 + Math.random() * 2) * cs, fwd.z * 8 + Math.sin(sa) * sm), phase: 'climb', dt: 0, cs,
       vmax: k % H_PER_SHOT === H_PER_SHOT - 1 ? 190 : H_VMAX, // the last warhead of every salvo is capped at 190 m/s
-      topY: (tg.fallback ? S.pos.y : p.y) + tg.climb * cs, st: tg.st, aim: aimPoint(tg.st) || S.pos.clone(), t: 0, speed: 20 });
+      topY: (tg.fallback ? S.pos.y : p.y) + tg.climb * cs, st: tg.st, aim: (tg.st && aimPoint(tg.st)) || tg.point || randomGroundPoint(), t: 0, speed: 20 });
     sfx.boom(0.12);
   }
   function updateHunters(dt) {

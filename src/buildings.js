@@ -7,7 +7,7 @@
 // Ornaments (cornices, parapets, plinths, pilasters, capitals) belong to the
 // chunk they sit on and disappear with it.
 import * as THREE from 'three';
-import { makeFacadeMaterial, WIN } from './facade.js?v=54';
+import { makeFacadeMaterial, WIN } from './facade.js?v=55';
 
 const EPS = 1e-3;
 
