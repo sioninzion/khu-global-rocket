@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { NIGHT } from './facade.js?v=51';
-import { City } from './buildings.js?v=51';
-import { buildStructures } from './models.js?v=51';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=51';
-import { Particles, Debris } from './fx.js?v=51';
-import { Input } from './input.js?v=51';
-import { Sfx } from './audio.js?v=51';
+import { NIGHT } from './facade.js?v=52';
+import { City } from './buildings.js?v=52';
+import { buildStructures } from './models.js?v=52';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=52';
+import { Particles, Debris } from './fx.js?v=52';
+import { Input } from './input.js?v=52';
+import { Sfx } from './audio.js?v=52';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -34,7 +34,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=51')).json();
+  const data = await (await fetch('data/campus.json?v=52')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -971,7 +971,7 @@ async function main() {
   }
 
   // ------------------------------------------------------------ air support: a beam from the sky erases everything inside it
-  const LASER_R = 20 * 1.75; // 35 m
+  const LASER_R = 25;
   const beam = new THREE.Group();
   const beamGeo = new THREE.CylinderGeometry(1, 1, 1, 32, 1, true); beamGeo.translate(0, 0.5, 0);
   const beamCore = new THREE.Mesh(beamGeo, addMat(0xffffff)), beamGlow = new THREE.Mesh(beamGeo, addMat(0x48d8ff));
