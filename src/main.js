@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=32';
-import { buildStructures } from './models.js?v=32';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=32';
-import { Particles, Debris } from './fx.js?v=32';
-import { Input } from './input.js?v=32';
-import { Sfx } from './audio.js?v=32';
+import { City } from './buildings.js?v=33';
+import { buildStructures } from './models.js?v=33';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=33';
+import { Particles, Debris } from './fx.js?v=33';
+import { Input } from './input.js?v=33';
+import { Sfx } from './audio.js?v=33';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=32')).json();
+  const data = await (await fetch('data/campus.json?v=33')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -613,7 +613,7 @@ async function main() {
   // ------------------------------------------------------------ guided bomber: each skill press launches a warhead
   // that climbs slowly, picks a random building 200-800 m ahead (within 130 degrees of the heading) and dives on it.
   // With nothing in that cone it climbs 70 m above the carrier and dives on the nearest building still standing.
-  const H_MAX = 4, H_RELOAD = 0.6, H_R = 18, H_MIN = 200, H_MAXD = 800, H_HALF = THREE.MathUtils.degToRad(65), H_VMAX = 400, H_PER_SHOT = 6, H_GAP = 0.1; // 130-degree cone, 6 warheads 0.1 s apart
+  const H_MAX = 4, H_RELOAD = 0.6, H_R = 18, H_MIN = 200, H_MAXD = 800, H_HALF = THREE.MathUtils.degToRad(65), H_VMAX = 400, H_PER_SHOT = 6, H_GAP = 0.04; // 130-degree cone, 6 warheads 0.04 s apart
   const hunters = [];
   const hunterGeo = new THREE.ConeGeometry(0.28, 1.6, 8); hunterGeo.rotateX(-Math.PI / 2);
   const hunterMat = new THREE.MeshLambertMaterial({ color: 0xff8a1e });
@@ -660,12 +660,14 @@ async function main() {
     if (!tg) { S.hQueue = 0; return; }
     computeFwd();
     const right = new THREE.Vector3(-fwd.z, 0, fwd.x).normalize();
-    const side = 0; // no sideways spread: warheads leave straight from the rocket
+    const side = 0;
     const mesh = new THREE.Mesh(hunterGeo, hunterMat);
     const p = S.pos.clone().add(new THREE.Vector3(0, -1, 0)).addScaledVector(right, side * 0.8);
     mesh.position.copy(p);
     scene.add(mesh);
-    hunters.push({ mesh, p, v: new THREE.Vector3(fwd.x * 8, 14, fwd.z * 8).addScaledVector(right, side * 6), phase: 'climb',
+    // a slight random scatter so the salvo visibly fans out a little as it leaves
+    const sa = Math.random() * Math.PI * 2, sm = 8 + Math.random() * 4;
+    hunters.push({ mesh, p, v: new THREE.Vector3(fwd.x * 8 + Math.cos(sa) * sm, 14 + Math.random() * 4, fwd.z * 8 + Math.sin(sa) * sm), phase: 'climb',
       topY: (tg.fallback ? S.pos.y : p.y) + tg.climb, st: tg.st, aim: aimPoint(tg.st), t: 0, speed: 20 });
     sfx.boom(0.12);
   }
