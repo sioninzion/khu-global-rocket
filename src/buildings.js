@@ -7,7 +7,7 @@
 // Ornaments (cornices, parapets, plinths, pilasters, capitals) belong to the
 // chunk they sit on and disappear with it.
 import * as THREE from 'three';
-import { makeFacadeMaterial, WIN } from './facade.js?v=19';
+import { makeFacadeMaterial, WIN } from './facade.js?v=20';
 
 const EPS = 1e-3;
 
@@ -344,7 +344,9 @@ export class Building {
 
   // column = true: a vertical cylinder of radius R wipes out every floor (sky laser)
   // ring = [r0, r1]: earthquake band, knocks out the ground floors of everything in the band
-  blast(x, y, z, R, rand, column = false, ring = null) {
+  // line = {ox,oy,oz,dx,dy,dz,len}: a beam of radius R cuts every chunk it passes through
+  blast(x, y, z, R, rand, column = false, ring = null, line = null) {
+    if (line) return this.beamCut(line, R);
     const killed = [];
     const nL = this.nL;
     for (let pi = 0; pi < this.pieces.length; pi++) {
@@ -363,6 +365,26 @@ export class Building {
         const d = Math.sqrt(d2 + dy * dy);
         // always take out the chunk that was struck (centre within ~4 m of impact)
         if (d < Math.max(R * (0.7 + 0.5 * rand()), 4.2)) { this.alive[c] = 0; killed.push(c); }
+      }
+    }
+    this.aliveCount -= killed.length;
+    const fallen = killed.length ? this.collapse() : [];
+    return { killed, fallen };
+  }
+
+  beamCut(L, R) {
+    const killed = [], nL = this.nL;
+    const pad = R + this.cs * 0.4;
+    for (let pi = 0; pi < this.pieces.length; pi++) {
+      const p = this.pieces[pi];
+      for (let l = 0; l < nL; l++) {
+        const c = pi * nL + l;
+        if (!this.alive[c]) continue;
+        const cy = this.ybot + (l + 0.5) * this.lh;
+        const vx = p.cx - L.ox, vy = cy - L.oy, vz = p.cz - L.oz;
+        const t = Math.max(0, Math.min(L.len, vx * L.dx + vy * L.dy + vz * L.dz));
+        const ex = vx - L.dx * t, ey = vy - L.dy * t, ez = vz - L.dz * t;
+        if (ex * ex + ez * ez < pad * pad && Math.abs(ey) < R + this.lh * 0.5) { this.alive[c] = 0; killed.push(c); }
       }
     }
     this.aliveCount -= killed.length;
@@ -672,7 +694,8 @@ export class City {
     return out;
   }
 
-  explode(x, y, z, R, rand, column = false, ring = null) {
+  explode(x, y, z, R, rand, column = false, ring = null, line = null) {
+    if (line) return this.beam(line, R);
     const out = [];
     const touched = new Set();
     const seen = new Set();
@@ -700,6 +723,34 @@ export class City {
           if (ex) ex.fallen.push(...fallen); else out.push({ b, killed: [], fallen });
           changed = true;
         }
+      }
+      if (!changed) break;
+    }
+    for (const r of out) this.refresh(r.b);
+    return out;
+  }
+
+  beam(L, R) {
+    const out = [], touched = new Set(), seen = new Set();
+    const steps = Math.ceil(L.len / (this.G * 0.5));
+    for (let i = 0; i <= steps; i++) {
+      const t = (i / steps) * L.len;
+      const x = L.ox + L.dx * t, z = L.oz + L.dz * t;
+      for (let gx = Math.floor((x - R - 6) / this.G); gx <= Math.floor((x + R + 6) / this.G); gx++)
+        for (let gz = Math.floor((z - R - 6) / this.G); gz <= Math.floor((z + R + 6) / this.G); gz++)
+          for (const b of this.grid.get(gx * 100000 + gz) || []) {
+            if (seen.has(b)) continue;
+            seen.add(b);
+            const res = b.beamCut(L, R);
+            if (res.killed.length || res.fallen.length) { out.push({ b, ...res }); touched.add(b.owner); }
+          }
+    }
+    for (let pass = 0; pass < 3; pass++) {
+      let changed = false;
+      for (const s of touched) for (const b of s.parts) {
+        if (b.aliveCount === 0 || !(b.supportParts || b.supportBelow)) continue;
+        const fallen = this.dropUnsupported(b);
+        if (fallen.length) { const ex = out.find(r => r.b === b); if (ex) ex.fallen.push(...fallen); else out.push({ b, killed: [], fallen }); changed = true; }
       }
       if (!changed) break;
     }

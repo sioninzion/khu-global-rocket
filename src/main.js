@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=19';
-import { buildStructures } from './models.js?v=19';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=19';
-import { Particles, Debris } from './fx.js?v=19';
-import { Input } from './input.js?v=19';
-import { Sfx } from './audio.js?v=19';
+import { City } from './buildings.js?v=20';
+import { buildStructures } from './models.js?v=20';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=20';
+import { Particles, Debris } from './fx.js?v=20';
+import { Input } from './input.js?v=20';
+import { Sfx } from './audio.js?v=20';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -27,13 +27,13 @@ function showError(msg) {
 addEventListener('error', (e) => showError('오류: ' + (e.message || e.error)));
 addEventListener('unhandledrejection', (e) => showError('오류: ' + (e.reason && e.reason.message || e.reason)));
 
-const SKILL_ICON = { rocket: '🔥', ballistic: '🎯', bomber: '💣', cluster: '💥', nuke: '☢️', airstrike: '🛰️', blackhole: '🌀', quake: '⛏️' };
-const WEAPON_LABEL = { ballistic: '🎯 탄도미사일', bomber: '💣 폭격 로켓', cluster: '💥 집속탄', nuke: '☢️ 핵폭탄', airstrike: '🛰️ 공중 지원', blackhole: '⚫ 블랙홀 미사일', quake: '🌋 지진탄' };
+const SKILL_ICON = { rocket: '🔥', ballistic: '🎯', bomber: '💣', cluster: '💥', nuke: '☢️', airstrike: '🛰️', blackhole: '🌀', quake: '⛏️', laser: '🔴' };
+const WEAPON_LABEL = { ballistic: '🎯 탄도미사일', bomber: '💣 폭격 로켓', cluster: '💥 집속탄', nuke: '☢️ 핵폭탄', airstrike: '🛰️ 공중 지원', blackhole: '⚫ 블랙홀 미사일', quake: '🌋 지진탄', laser: '🔴 레이저 미사일' };
 const KIND = { apartments: '아파트', house: '주택', school: '학교', college: '대학 건물', dormitory: '기숙사', commercial: '상가', retail: '상가', residential: '주거 건물' };
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=19')).json();
+  const data = await (await fetch('data/campus.json?v=20')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -246,6 +246,19 @@ async function main() {
     fins(g, dark, R + 0.25, 1.2, 0.85, 0.9, 0.08);
     crafts.quake = { group: g, flames: addFlames(g, 1.65, 1.2), tail: 2.8, skill: '드릴', name: '지진탄', drill };
   }
+  // laser missile: white body, red bands and a glowing emitter lens in the nose
+  const LASER_MISSILE_R = 0.45;
+  {
+    const g = new THREE.Group();
+    const R = LASER_MISSILE_R;
+    const white = new THREE.MeshLambertMaterial({ color: 0xf2f2f4 }), red = new THREE.MeshLambertMaterial({ color: 0xc81e4a });
+    const glow = new THREE.MeshBasicMaterial({ color: 0xff3355 });
+    g.add(cyl(R, R, 3.0, white, 0), cyl(R + 0.01, R + 0.01, 0.2, red, -0.9), cyl(R + 0.01, R + 0.01, 0.2, red, 0.5));
+    const nose = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.7, R, 0.9, 18), white); nose.rotation.x = Math.PI / 2; nose.position.z = -1.95; g.add(nose);
+    const lens = new THREE.Mesh(new THREE.SphereGeometry(R * 0.6, 16, 10), glow); lens.position.z = -2.4; g.add(lens);
+    fins(g, red, R + 0.25, 1.2, 0.8, 0.85, 0.06);
+    crafts.laser = { group: g, flames: addFlames(g, 1.5, 1.1), tail: 2.6, skill: '레이저', name: '레이저 미사일', lens };
+  }
   for (const c of Object.values(crafts)) { c.group.rotation.order = 'YXZ'; c.group.visible = false; scene.add(c.group); }
   let craft = crafts.rocket;
   craft.group.visible = true; // shown on the pad behind the title screen
@@ -284,8 +297,8 @@ async function main() {
   const downSet = new Set();
   let baseFov = 62;
   // weapons unlock by total chunks destroyed (remembered on this device)
-  const UNLOCKS = { ballistic: 300, bomber: 1200, cluster: 3400, nuke: 7000, airstrike: 12000, blackhole: 20000, quake: 30000 };
-  const WBTN = { rocket: 'wRocket', ballistic: 'wBallistic', bomber: 'wBomber', cluster: 'wCluster', nuke: 'wNuke', airstrike: 'wAir', blackhole: 'wBlack', quake: 'wQuake' };
+  const UNLOCKS = { ballistic: 300, bomber: 1200, cluster: 3400, nuke: 7000, airstrike: 12000, blackhole: 20000, quake: 30000, laser: 45000 };
+  const WBTN = { rocket: 'wRocket', ballistic: 'wBallistic', bomber: 'wBomber', cluster: 'wCluster', nuke: 'wNuke', airstrike: 'wAir', blackhole: 'wBlack', quake: 'wQuake', laser: 'wLaser' };
   S.unlocked = { rocket: true, ballistic: false, bomber: false };
   for (const w of Object.keys(UNLOCKS)) { try { S.unlocked[w] = localStorage.getItem('khu-' + w) === '1'; } catch { /* ignore */ } }
   S.weapon = S.nextWeapon = 'rocket';
@@ -310,7 +323,7 @@ async function main() {
     for (const [w, need] of Object.entries(UNLOCKS)) {
       if (!S.unlocked[w] && S.score >= need) {
         setUnlocked(w);
-        const msg = { ballistic: '🎯 탄도미사일', bomber: '💣 폭격 로켓', cluster: '💥 집속탄', nuke: '☢️ 핵폭탄', airstrike: '🛰️ 공중 지원', blackhole: '⚫ 블랙홀 미사일', quake: '🌋 지진탄' }[w] + ' 해금! 위에서 고를 수 있어요';
+        const msg = { ballistic: '🎯 탄도미사일', bomber: '💣 폭격 로켓', cluster: '💥 집속탄', nuke: '☢️ 핵폭탄', airstrike: '🛰️ 공중 지원', blackhole: '⚫ 블랙홀 미사일', quake: '🌋 지진탄', laser: '🔴 레이저 미사일' }[w] + ' 해금! 위에서 고를 수 있어요';
         setTimeout(() => toast(msg, true), delay);
         delay += 2600;
       }
@@ -330,7 +343,7 @@ async function main() {
     $('skillIcon').textContent = SKILL_ICON[S.weapon] || '🔥';
     $('skillBadge').classList.toggle('show', S.weapon === 'bomber');
     if (craft.booster && craft.booster.parent !== craft.group) restoreBooster();
-    S.dashed = false; S.dashT = 0; S.prevSkill = false; S.charges = MAX_CHARGES; S.clustered = false; S.drill = false;
+    S.dashed = false; S.dashT = 0; S.prevSkill = false; S.charges = MAX_CHARGES; S.clustered = false; S.drill = false; S.firing = false;
     rocket.visible = true;
     setFlames(false);
     S.countdown = S.firstLaunch ? 3 : 1.5;
@@ -377,9 +390,9 @@ async function main() {
 
   // blow up chunks around p; shared by the rocket itself and by dropped bombs
   // pull = true: black hole, pieces are sucked toward p instead of thrown out (no fireball)
-  function blast(p, R, power, hitB, quiet, column = false, pull = false, ring = null) {
+  function blast(p, R, power, hitB, quiet, column = false, pull = false, ring = null, line = null) {
     const big = clamp(R / 12, 0.45, 4);
-    const res = city.explode(p.x, p.y, p.z, R, Math.random, column, ring);
+    const res = city.explode(p.x, p.y, p.z, R, Math.random, column, ring, line);
     // huge blasts: only every k-th chunk becomes a flying piece (keeps phones smooth)
     const total = res.reduce((t, r) => t + r.killed.length + r.fallen.length, 0);
     const every = Math.max(1, Math.ceil(total / 700));
@@ -392,6 +405,7 @@ async function main() {
         if (idx++ % every) { killedN++; continue; }
         const ci = r.b.chunkInfo(c);
         tmp.set(ci.x - p.x, ci.y - p.y, ci.z - p.z).normalize();
+        if (line) { const t = tmp.x * line.dx + tmp.y * line.dy + tmp.z * line.dz; tmp.set(tmp.x - line.dx * t, tmp.y - line.dy * t + 0.4, tmp.z - line.dz * t).normalize(); }
         if (pull) {
           const sw = 8 + Math.random() * 8;
           debris.spawn(ci.x, ci.y, ci.z, ci.sx * 0.9, ci.sy * 0.85, ci.sz * 0.9, -tmp.x * 10 - tmp.z * sw, 4, -tmp.z * 10 + tmp.x * sw, ci.color, 5);
@@ -416,23 +430,23 @@ async function main() {
       }
     }
     // fireball
-    for (let i = 0; i < (pull ? 0 : 55 * big); i++) {
+    for (let i = 0; i < (pull || line ? 0 : 55 * big); i++) {
       tmp.set(Math.random() - 0.5, Math.random() - 0.3, Math.random() - 0.5).normalize();
       const sp = (8 + Math.random() * 26) * Math.sqrt(big);
       fire.spawn(p.x, p.y, p.z, tmp.x * sp, tmp.y * sp, tmp.z * sp, (5 + Math.random() * 6) * Math.sqrt(big), 8 * big + R, 0.5 + Math.random() * 0.7, 1, 0.75, 0.35, 1, 0.9, 2);
     }
-    for (let i = 0; i < (pull ? 0 : 40 * Math.min(1, big)); i++) {
+    for (let i = 0; i < (pull || line ? 0 : 40 * Math.min(1, big)); i++) {
       tmp.set(Math.random() - 0.5, Math.random(), Math.random() - 0.5).normalize();
       const sp = 30 + Math.random() * 40;
       fire.spawn(p.x, p.y, p.z, tmp.x * sp, tmp.y * sp, tmp.z * sp, 0.6, 0, 0.6 + Math.random() * 0.6, 1, 0.9, 0.5, 1, 0.94, -8);
     }
-    for (let i = 0; i < (pull ? 0 : 35 * big); i++) {
+    for (let i = 0; i < (pull || line ? 0 : 35 * big); i++) {
       tmp.set(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5).normalize();
       const sp = (4 + Math.random() * 10) * Math.sqrt(big);
       const g = 0.18 + Math.random() * 0.15;
       smoke.spawn(p.x, p.y, p.z, tmp.x * sp, tmp.y * sp, tmp.z * sp, 6 * Math.sqrt(big), 22 * big + R * 2, 3 + Math.random() * 3, g, g, g, 0.85, 0.96, 3);
     }
-    if (!pull) {
+    if (!pull && !line) {
       if (!quiet || flash.intensity < 1500) { flash.position.copy(p); flash.intensity = quiet ? 1500 : 4000; }
       sfx.boom(Math.min(1.6, quiet ? 0.35 : 0.7 + power * 0.4 + (big - 1) * 0.3));
     }
@@ -461,8 +475,8 @@ async function main() {
     if (S.weapon === 'airstrike') { startLaser(p); S.boomTime = 5.2; S.boomScale = 1.8; }
     if (S.weapon === 'blackhole') { startBlackHole(p); S.boomTime = BH_TIME + 1.4; S.boomScale = 2.3; }
     if (S.weapon === 'quake') {
-      // plain impact: 100 m; drill dive: twice the height it fell
-      const qr = S.drill ? Math.max(20, 2 * (S.drillY0 - p.y)) : 100;
+      // plain impact: 100 m; drill dive: the height it fell
+      const qr = S.drill ? Math.max(20, S.drillY0 - p.y) : 100;
       startQuake(p, qr); S.boomTime = QUAKE_TIME + 2.5; S.boomScale = 4.2; }
     let msg;
     if (main) {
@@ -540,6 +554,43 @@ async function main() {
       }
     }
     if (t > 7) { nuke.on = false; fireball.visible = shock.visible = false; }
+  }
+
+  // ------------------------------------------------------------ laser missile: a beam 4x the missile's radius fired along the heading
+  const BEAM_R = LASER_MISSILE_R * 4, BEAM_LEN = 420;
+  const beamGeo2 = new THREE.CylinderGeometry(1, 1, 1, 20, 1, true); beamGeo2.rotateX(Math.PI / 2); beamGeo2.translate(0, 0, -0.5);
+  const lzCore = new THREE.Mesh(beamGeo2, addMat(0xffffff)), lzGlow = new THREE.Mesh(beamGeo2, addMat(0xff2a4a));
+  lzCore.material.side = lzGlow.material.side = THREE.DoubleSide;
+  const lzGroup = new THREE.Group(); lzGroup.add(lzGlow, lzCore); lzGroup.visible = false; scene.add(lzGroup);
+  let lzTick = 0;
+  function updateBeam(dt) {
+    const on = S.mode === 'flight' && S.weapon === 'laser' && S.firing;
+    lzGroup.visible = on;
+    if (!on) { lzTick = 0; return; }
+    computeFwd();
+    const o = tmp.copy(S.pos).addScaledVector(fwd, 2.6);
+    // the beam stops where it meets the ground
+    let len = BEAM_LEN;
+    for (let t = 4; t < BEAM_LEN; t += 4) {
+      const x = o.x + fwd.x * t, y = o.y + fwd.y * t, z = o.z + fwd.z * t;
+      if (y < terrain.height(x, z)) { len = t; break; }
+    }
+    lzGroup.position.copy(o);
+    lzGroup.quaternion.copy(craft.group.quaternion);
+    const pulse = 0.85 + 0.15 * Math.sin(performance.now() * 0.05);
+    lzCore.scale.set(BEAM_R * 0.4 * pulse, BEAM_R * 0.4 * pulse, len);
+    lzGlow.scale.set(BEAM_R * pulse, BEAM_R * pulse, len);
+    lzCore.material.opacity = 0.95; lzGlow.material.opacity = 0.55;
+    S.shake = Math.max(S.shake, 0.35);
+    const end = new THREE.Vector3(o.x + fwd.x * len, o.y + fwd.y * len, o.z + fwd.z * len);
+    for (let i = 0; i < 3; i++) fire.spawn(end.x, end.y, end.z, (Math.random() - 0.5) * 20, Math.random() * 15, (Math.random() - 0.5) * 20, 2, 3, 0.3, 1, 0.35, 0.4, 1, 0.94, 0);
+    lzTick -= dt;
+    if (lzTick <= 0) {
+      lzTick = 0.08;
+      const { n, main, downMsg } = blast(o.clone(), BEAM_R, 0.8, null, true, false, false, null, { ox: o.x, oy: o.y, oz: o.z, dx: fwd.x, dy: fwd.y, dz: fwd.z, len });
+      if (downMsg) toast(downMsg, true);
+      else if (main && n > 6) toast(`🔴 ${main.b.name || KIND[main.b.kind] || '건물'} 절단!`);
+    }
   }
 
   // ------------------------------------------------------------ earthquake: a ground wave knocks out ground floors,
@@ -1025,6 +1076,10 @@ async function main() {
           targetSpeed = 46;
           S.boosting = false;
           if (skillPress && S.t > 0.3) fireDash();
+        } else if (S.weapon === 'laser') {
+          S.boosting = false;
+          S.firing = inp.boost && S.fuel > (S.firing ? 0 : 0.1);
+          S.fuel = clamp(S.fuel + (S.firing ? -0.34 : 0.12) * dt, 0, 1);
         } else if (S.weapon === 'quake') {
           S.boosting = false;
           if (skillPress && S.t > 0.3) { S.drill = true; S.drillY0 = S.pos.y; toast('⛏️ 드릴 강하!'); sfx.boom(0.3); }
@@ -1110,6 +1165,7 @@ async function main() {
     updateLaser(dt);
     updateBlackHole(dt);
     updateQuake(dt);
+    updateBeam(dt);
     fire.update(dt); smoke.update(dt); debris.update(dt);
     flash.intensity *= Math.exp(-dt * 7);
     if (flash.intensity < 1) flash.intensity = 0;
@@ -1120,7 +1176,7 @@ async function main() {
     const agl = S.pos.y - terrain.height(S.pos.x, S.pos.z);
     $('speed').textContent = Math.round(S.speed * 3.6);
     $('alt').textContent = Math.max(0, Math.round(agl));
-    const gauge = S.weapon === 'quake' ? (S.drill ? 0 : 1) : S.weapon === 'nuke' || S.weapon === 'blackhole' ? 1 : S.weapon === 'ballistic' ? (S.dashed ? 0 : 1) : S.weapon === 'cluster' ? (S.clustered ? 0 : 1) : S.weapon === 'bomber' ? S.charges / MAX_CHARGES : S.fuel;
+    const gauge = S.weapon === 'laser' ? S.fuel : S.weapon === 'quake' ? (S.drill ? 0 : 1) : S.weapon === 'nuke' || S.weapon === 'blackhole' ? 1 : S.weapon === 'ballistic' ? (S.dashed ? 0 : 1) : S.weapon === 'cluster' ? (S.clustered ? 0 : 1) : S.weapon === 'bomber' ? S.charges / MAX_CHARGES : S.fuel;
     $('boostBtn').style.setProperty('--cd', gauge.toFixed(3));
     $('boostBtn').classList.toggle('empty', S.weapon === 'cluster' ? S.clustered : S.weapon === 'ballistic' ? S.dashed : S.weapon === 'bomber' ? S.charges < 1 : S.fuel < 0.12 && !S.boosting);
     if (S.weapon === 'bomber') { const c = String(Math.floor(S.charges)); if ($('skillBadge').textContent !== c) $('skillBadge').textContent = c; }
