@@ -1,8 +1,8 @@
 // Building models. Campus landmarks are modelled by hand from photo references
 // (shape, storeys, colonnades, towers, roofs, materials); everything else gets a
 // style from its OSM type (Korean apartment blocks, houses, schools, shops...).
-import { WIN } from './facade.js?v=27';
-import { obb, area, makeRng, pip } from './buildings.js?v=27';
+import { WIN } from './facade.js?v=28';
+import { obb, area, makeRng, pip } from './buildings.js?v=28';
 
 // ------------------------------------------------------------ geometry helpers
 const circle = (cx, cz, r, n = 12) => Array.from({ length: n }, (_, i) => [cx + Math.cos(i / n * Math.PI * 2) * r, cz + Math.sin(i / n * Math.PI * 2) * r]);

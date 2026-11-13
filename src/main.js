@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=27';
-import { buildStructures } from './models.js?v=27';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=27';
-import { Particles, Debris } from './fx.js?v=27';
-import { Input } from './input.js?v=27';
-import { Sfx } from './audio.js?v=27';
+import { City } from './buildings.js?v=28';
+import { buildStructures } from './models.js?v=28';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=28';
+import { Particles, Debris } from './fx.js?v=28';
+import { Input } from './input.js?v=28';
+import { Sfx } from './audio.js?v=28';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=27')).json();
+  const data = await (await fetch('data/campus.json?v=28')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -360,7 +360,7 @@ async function main() {
     $('skillIcon').textContent = SKILL_ICON[S.weapon] || '🔥';
     $('skillBadge').classList.toggle('show', S.weapon === 'bomber' || S.weapon === 'hunter');
     if (craft.booster && craft.booster.parent !== craft.group) restoreBooster();
-    S.dashed = false; S.dashT = 0; S.prevSkill = false; S.charges = MAX_CHARGES; S.clustered = false; S.drill = false; S.firing = false; S.hCharges = H_MAX;
+    S.dashed = false; S.dashT = 0; S.prevSkill = false; S.charges = MAX_CHARGES; S.clustered = false; S.drill = false; S.firing = false; S.hCharges = H_MAX; S.hQueue = 0;
     rocket.visible = true;
     setFlames(false);
     S.countdown = S.firstLaunch ? 3 : 1.5;
@@ -611,9 +611,9 @@ async function main() {
   }
 
   // ------------------------------------------------------------ guided bomber: each skill press launches a warhead
-  // that climbs slowly, picks a random building 200-800 m ahead (within 80 degrees of the heading) and dives on it.
+  // that climbs slowly, picks a random building 200-800 m ahead (within 130 degrees of the heading) and dives on it.
   // With nothing in that cone it climbs 70 m above the carrier and dives on the nearest building still standing.
-  const H_MAX = 4, H_RELOAD = 0.6, H_R = 14, H_MIN = 200, H_MAXD = 800, H_HALF = THREE.MathUtils.degToRad(40), H_VMAX = 400, H_PER_SHOT = 3; // 80-degree cone, warheads top out at 400 m/s, 3 per press
+  const H_MAX = 4, H_RELOAD = 0.6, H_R = 18, H_MIN = 200, H_MAXD = 800, H_HALF = THREE.MathUtils.degToRad(65), H_VMAX = 400, H_PER_SHOT = 6, H_GAP = 0.1; // 130-degree cone, 6 warheads 0.1 s apart
   const hunters = [];
   const hunterGeo = new THREE.ConeGeometry(0.28, 1.6, 8); hunterGeo.rotateX(-Math.PI / 2);
   const hunterMat = new THREE.MeshLambertMaterial({ color: 0xff8a1e });
@@ -646,26 +646,27 @@ async function main() {
     if (inCone.length) return { st: inCone[Math.floor(Math.random() * inCone.length)], climb: 50 };
     return nearest ? { st: nearest, climb: 70, fallback: true } : null;
   }
+  // one press: a salvo of H_PER_SHOT warheads, H_GAP seconds apart (alternating left/right)
   function fireHunter() {
-    let first = null;
+    const tg = pickTarget();
+    if (!tg) { toast('남은 건물이 없어요'); return; }
+    S.hCharges -= 1;
+    S.hQueue = H_PER_SHOT; S.hQTimer = 0;
+    toast(`🧨 탄두 ${H_PER_SHOT}발 발사${tg.fallback ? ' (범위 밖, 고공 강하)' : ''}`);
+  }
+  function launchWarhead(k) {
+    const tg = pickTarget();
+    if (!tg) { S.hQueue = 0; return; }
     computeFwd();
     const right = new THREE.Vector3(-fwd.z, 0, fwd.x).normalize();
-    for (let k = 0; k < H_PER_SHOT; k++) {
-      const tg = pickTarget();
-      if (!tg) { if (!first) toast('남은 건물이 없어요'); break; }
-      first = first || tg;
-      const side = k - (H_PER_SHOT - 1) / 2; // -1, 0, 1
-      const mesh = new THREE.Mesh(hunterGeo, hunterMat);
-      const p = S.pos.clone().add(new THREE.Vector3(0, -1, 0)).addScaledVector(right, side * 1.2);
-      mesh.position.copy(p);
-      scene.add(mesh);
-      hunters.push({ mesh, p, v: new THREE.Vector3(fwd.x * 8, 14, fwd.z * 8).addScaledVector(right, side * 7), phase: 'climb',
-        topY: (tg.fallback ? S.pos.y : p.y) + tg.climb, st: tg.st, aim: aimPoint(tg.st), t: 0, speed: 20 });
-    }
-    if (!first) return;
-    S.hCharges -= 1;
-    toast(`🧨 탄두 ${H_PER_SHOT}발 발사${first.fallback ? ' (범위 밖, 고공 강하)' : ''}`);
-    sfx.boom(0.25);
+    const side = (k % 2 ? 1 : -1) * (1 + Math.floor(k / 2) * 0.5);
+    const mesh = new THREE.Mesh(hunterGeo, hunterMat);
+    const p = S.pos.clone().add(new THREE.Vector3(0, -1, 0)).addScaledVector(right, side * 0.8);
+    mesh.position.copy(p);
+    scene.add(mesh);
+    hunters.push({ mesh, p, v: new THREE.Vector3(fwd.x * 8, 14, fwd.z * 8).addScaledVector(right, side * 6), phase: 'climb',
+      topY: (tg.fallback ? S.pos.y : p.y) + tg.climb, st: tg.st, aim: aimPoint(tg.st), t: 0, speed: 20 });
+    sfx.boom(0.12);
   }
   function updateHunters(dt) {
     for (let i = hunters.length - 1; i >= 0; i--) {
@@ -1194,9 +1195,10 @@ async function main() {
           if (skillPress && S.t > 0.3) fireDash();
         } else if (S.weapon === 'hunter') {
           S.boosting = false;
-          targetSpeed = 80 / 3.6; // the carrier cruises at 80 km/h (as shown on the HUD)
+          targetSpeed = 65 / 3.6; // the carrier cruises at 65 km/h (as shown on the HUD)
           S.hCharges = Math.min(H_MAX, S.hCharges + dt / H_RELOAD);
-          if (skillPress && S.hCharges >= 1) fireHunter();
+          if (skillPress && S.hCharges >= 1 && !(S.hQueue > 0)) fireHunter();
+          if (S.hQueue > 0) { S.hQTimer -= dt; if (S.hQTimer <= 0) { S.hQTimer += H_GAP; launchWarhead(H_PER_SHOT - S.hQueue); S.hQueue--; } }
         } else if (S.weapon === 'laser') {
           S.boosting = false;
           targetSpeed = 100 / 3.6; // laser missile cruises at 100 km/h (as shown on the HUD)
