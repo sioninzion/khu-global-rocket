@@ -69,6 +69,7 @@ export class Debris {
     this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xffffff }), cap);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
+    this.mesh.castShadow = true;
     this.items = [];
     for (let i = 0; i < cap; i++) this.items.push({ on: false, p: new THREE.Vector3(), v: new THREE.Vector3(), q: new THREE.Quaternion(), w: new THREE.Vector3(), s: new THREE.Vector3(), t: 0 });
     this.m = new THREE.Matrix4(); this.zero = new THREE.Matrix4().makeScale(0, 0, 0);

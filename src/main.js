@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { City } from './buildings.js';
+import { buildStructures } from './models.js';
 import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js';
 import { Particles, Debris } from './fx.js';
 import { Input } from './input.js';
@@ -24,10 +25,22 @@ async function main() {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0xc9dbe8, 350, 2600);
   const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 9000);
-  scene.add(new THREE.HemisphereLight(0xe4f0ff, 0x6a7352, 1.5));
-  const sun = new THREE.DirectionalLight(0xfff0dc, 2.3);
-  sun.position.set(0.45, 0.55, -0.7).multiplyScalar(100);
-  scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0xe4f0ff, 0x6a7352, 1.15));
+  const sun = new THREE.DirectionalLight(0xfff0dc, 2.9);
+  const SUN_DIR = new THREE.Vector3(0.45, 0.55, -0.7).normalize();
+  sun.position.copy(SUN_DIR).multiplyScalar(100);
+  scene.add(sun, sun.target);
+  // sun shadows in a box that follows the camera
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  let shadowsOn = true;
+  try { shadowsOn = localStorage.getItem('khu-shadows') !== '0'; } catch { /* ignore */ }
+  sun.castShadow = shadowsOn;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -160, right: 160, top: 160, bottom: -160, near: 10, far: 1200 });
+  sun.shadow.camera.updateProjectionMatrix();
+  sun.shadow.bias = -0.0005;
+  sun.shadow.normalBias = 0.5;
   const flash = new THREE.PointLight(0xffa955, 0, 160, 1.2);
   scene.add(flash);
   const sky = buildSky();
@@ -40,7 +53,7 @@ async function main() {
   scene.add(buildOuterGround(terrain));
 
   setLoad('건물 조각내는 중…'); await frame();
-  const city = new City(data, scene, data.campus);
+  const city = new City(buildStructures(data), scene);
   setLoad('나무 심는 중…'); await frame();
   for (const m of buildTrees(data, terrain, city)) scene.add(m);
 
@@ -147,7 +160,7 @@ async function main() {
     const R = 8 + 6 * power;
     const res = city.explode(p.x, p.y, p.z, R, Math.random);
     let killedN = 0, fallenN = 0;
-    let main = hitB ? res.find(r => r.b === hitB) : null;
+    let main = hitB ? res.find(r => r.b.owner === hitB.owner) : null;
     for (const r of res) {
       if (!main || r.killed.length > main.killed.length && !hitB) main = r;
       for (const c of r.killed) {
@@ -197,8 +210,9 @@ async function main() {
       const b = main.b;
       const name = b.name || KIND[b.kind] || '건물';
       msg = `${name} 명중! ${n}조각 파괴`;
-      for (const r of res) {
-        if (!downSet.has(r.b) && r.b.aliveCount / r.b.total < 0.15) { downSet.add(r.b); S.down++; msg = `${r.b.name || KIND[r.b.kind] || '건물'} 붕괴! 💥 ${n}조각`; }
+      for (const s of new Set(res.map(r => r.b.owner))) {
+        const alive = s.parts.reduce((t, q) => t + q.aliveCount, 0);
+        if (!downSet.has(s) && alive / s.total < 0.15) { downSet.add(s); S.down++; msg = `${s.name || KIND[s.kind] || '건물'} 붕괴! 💥 ${n}조각`; }
       }
     } else {
       msg = hitB === null && S.outOfBounds ? '범위를 벗어났어요' : n ? `${n}조각 파괴` : '지면 충돌!';
@@ -301,7 +315,7 @@ async function main() {
     if (S.mode === 'pad' || S.mode === 'title') {
       const hx = Math.sin(startYaw), hz = -Math.cos(startYaw);
       const rise = S.mode === 'pad' ? S.t * 0.6 : 0;
-      tmp.set(pad.x - hx * 20 + hz * 6, padTop + 6 + rise, pad.z - hz * 20 - hx * 6);
+      tmp.set(pad.x - hx * 20 + hz * 6, padTop + 10 + rise, pad.z - hz * 20 - hx * 6);
       camPos.lerp(tmp, S.mode === 'title' ? 1 : k);
       camLook.lerp(tmp.set(pad.x + hx * 30, padTop + 6, pad.z + hz * 30), S.mode === 'title' ? 1 : k);
     } else if (S.mode === 'flight' && S.t < 1.3) {
@@ -315,6 +329,8 @@ async function main() {
       const desired = new THREE.Vector3(S.pos.x - tmp.x * back, S.pos.y - tmp.y * back + 3.2, S.pos.z - tmp.z * back);
       camPos.lerp(desired, 1 - Math.exp(-dt * 7));
       camLook.lerp(tmp.copy(S.pos).addScaledVector(fwd, 22), 1 - Math.exp(-dt * 9));
+    } else if (S.mode === 'debug') {
+      // camera placed by window.__game.look() for testing
     } else if (S.mode === 'boom') {
       S.orbit += dt * 0.35;
       const dist = 42 + S.t * 4;
@@ -336,6 +352,15 @@ async function main() {
     }
     camera.lookAt(camLook);
     sky.position.copy(camera.position);
+    // centre the shadow box a little ahead of the camera, snapped to shadow texels
+    tmp.copy(camLook).sub(camera.position).setY(0);
+    const ahead = Math.min(tmp.length(), 90);
+    tmp.normalize().multiplyScalar(ahead).add(camera.position);
+    const texel = 320 / 2048;
+    tmp.x = Math.round(tmp.x / texel) * texel; tmp.z = Math.round(tmp.z / texel) * texel;
+    tmp.y = terrain.height(tmp.x, tmp.z);
+    sun.target.position.copy(tmp);
+    sun.position.copy(tmp).addScaledVector(SUN_DIR, 500);
   }
 
   let miniT = 0;
@@ -345,7 +370,7 @@ async function main() {
     miniT = 0;
     mg.drawImage(miniBase, 0, 0);
     mg.fillStyle = '#ff3b30';
-    for (const b of downSet) { mg.beginPath(); mg.arc(mX((b.minx + b.maxx) / 2), mZ((b.minz + b.maxz) / 2), 4, 0, 7); mg.fill(); }
+    for (const s of downSet) { const b = s.parts[0]; mg.beginPath(); mg.arc(mX((b.minx + b.maxx) / 2), mZ((b.minz + b.maxz) / 2), 4, 0, 7); mg.fill(); }
     mg.fillStyle = '#ffd60a';
     mg.fillRect(mX(pad.x) - 4, mZ(pad.z) - 4, 8, 8);
     if (S.mode === 'flight' || S.mode === 'pad') {
@@ -374,12 +399,40 @@ async function main() {
   updateCamera(0.016);
 
   // debug/testing hook: advance the simulation without requestAnimationFrame
+  window.__game.look = (px, py, pz, tx, ty, tz) => {
+    S.mode = 'debug'; camPos.set(px, py, pz); camLook.set(tx, ty, tz); rocket.visible = false;
+    document.getElementById('title').classList.add('hide');
+    updateCamera(0); renderer.render(scene, camera); return 'ok';
+  };
+  window.__game.find = (name) => { const s = city.structures.find(q => q.name === name); const b = s.parts[0]; return [(b.minx + b.maxx) / 2, b.base, (b.minz + b.maxz) / 2, b.ytop - b.base]; };
   window.__game.step = (n = 1, dt = 1 / 60, render = true) => { for (let i = 0; i < n; i++) update(dt); if (render) { drawMini(1); renderer.render(scene, camera); } return S.mode; };
+  // adaptive quality: slow phones drop shadows first, then resolution
+  let perfAcc = 0, perfN = 0, quality = 2;
+  function watchPerf(rawDt) {
+    if (quality === 0 || document.hidden || S.mode === 'title' || S.mode === 'debug') return;
+    perfAcc += rawDt; perfN++;
+    if (perfAcc < 2.5) return;
+    const fps = perfN / perfAcc;
+    perfAcc = 0; perfN = 0;
+    if (fps >= 38) return;
+    if (quality === 2 && shadowsOn) {
+      shadowsOn = false; sun.castShadow = false; $('btnShadow').classList.remove('on');
+      toast('부드럽게 돌아가도록 그림자를 껐어요');
+    } else {
+      renderer.setPixelRatio(1); resize();
+      toast('부드럽게 돌아가도록 해상도를 낮췄어요');
+      quality = 0; return;
+    }
+    quality = 1;
+  }
+
   let last = performance.now();
   renderer.setAnimationLoop(() => {
     const now = performance.now();
-    const dt = Math.min(0.05, (now - last) / 1000);
+    const raw = (now - last) / 1000;
+    const dt = Math.min(0.05, raw);
     last = now;
+    if (raw < 0.5) watchPerf(raw);
     update(dt);
     drawMini(dt);
     renderer.render(scene, camera);
@@ -388,9 +441,15 @@ async function main() {
   // ------------------------------------------------------------ UI
   $('btnInvert').classList.toggle('on', input.invert);
   $('btnInvert').addEventListener('click', () => { $('btnInvert').classList.toggle('on', input.toggleInvert()); });
+  $('btnShadow').classList.toggle('on', shadowsOn);
+  $('btnShadow').addEventListener('click', () => {
+    shadowsOn = !shadowsOn; sun.castShadow = shadowsOn;
+    $('btnShadow').classList.toggle('on', shadowsOn);
+    try { localStorage.setItem('khu-shadows', shadowsOn ? '1' : '0'); } catch { /* ignore */ }
+  });
   $('btnMute').addEventListener('click', () => { $('btnMute').textContent = sfx.toggleMute() ? '🔇' : '🔊'; });
   $('btnReset').addEventListener('click', () => { if (confirm('캠퍼스를 복구할까요? (점수 초기화)')) location.reload(); });
-  setLoad(`건물 ${city.buildings.length}채 · 조각 ${city.totalChunks.toLocaleString()}개 준비 완료`);
+  setLoad(`건물 ${city.structures.length}채 · 조각 ${city.totalChunks.toLocaleString()}개 준비 완료`);
   const start = $('start');
   start.disabled = false;
   start.textContent = '🚀 출격';
