@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=22';
-import { buildStructures } from './models.js?v=22';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=22';
-import { Particles, Debris } from './fx.js?v=22';
-import { Input } from './input.js?v=22';
-import { Sfx } from './audio.js?v=22';
+import { City } from './buildings.js?v=23';
+import { buildStructures } from './models.js?v=23';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=23';
+import { Particles, Debris } from './fx.js?v=23';
+import { Input } from './input.js?v=23';
+import { Sfx } from './audio.js?v=23';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=22')).json();
+  const data = await (await fetch('data/campus.json?v=23')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -475,8 +475,8 @@ async function main() {
     if (S.weapon === 'airstrike') { startLaser(p); S.boomTime = 5.2; S.boomScale = 1.8; }
     if (S.weapon === 'blackhole') { startBlackHole(p); S.boomTime = BH_TIME + 1.4; S.boomScale = 2.3; }
     if (S.weapon === 'quake') {
-      // plain impact: 100 m; drill dive: the height it fell
-      const qr = S.drill ? Math.max(20, S.drillY0 - p.y) : 100;
+      // plain impact: 100 m; drill dive: 0.7x the height it fell
+      const qr = S.drill ? Math.max(20, 0.7 * (S.drillY0 - p.y)) : 100;
       startQuake(p, qr); S.boomTime = QUAKE_TIME + 2.5; S.boomScale = 4.2; }
     let msg;
     if (main) {
@@ -586,7 +586,7 @@ async function main() {
     for (let i = 0; i < 3; i++) fire.spawn(end.x, end.y, end.z, (Math.random() - 0.5) * 20, Math.random() * 15, (Math.random() - 0.5) * 20, 2, 3, 0.3, 1, 0.35, 0.4, 1, 0.94, 0);
     lzTick -= dt;
     if (lzTick <= 0) {
-      lzTick = 0.04; // hits 25 times a second
+      lzTick = 1 / 18; // hits 18 times a second
       const { n, main, downMsg } = blast(o.clone(), BEAM_CUT_R, 0.8, null, true, false, false, null, { ox: o.x, oy: o.y, oz: o.z, dx: fwd.x, dy: fwd.y, dz: fwd.z, len });
       if (downMsg) toast(downMsg, true);
       else if (main && n > 6) toast(`🔴 ${main.b.name || KIND[main.b.kind] || '건물'} 절단!`);
@@ -1078,6 +1078,7 @@ async function main() {
           if (skillPress && S.t > 0.3) fireDash();
         } else if (S.weapon === 'laser') {
           S.boosting = false;
+          targetSpeed = 100 / 3.6; // laser missile cruises at 100 km/h (as shown on the HUD)
           S.firing = inp.boost && S.fuel > (S.firing ? 0 : 0.1);
           S.fuel = clamp(S.fuel + (S.firing ? -0.17 : 0.12 * 1.8) * dt, 0, 1); // half the drain, 1.8x recharge
         } else if (S.weapon === 'quake') {
