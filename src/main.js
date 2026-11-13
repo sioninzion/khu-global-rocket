@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=41';
-import { buildStructures } from './models.js?v=41';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=41';
-import { Particles, Debris } from './fx.js?v=41';
-import { Input } from './input.js?v=41';
-import { Sfx } from './audio.js?v=41';
+import { City } from './buildings.js?v=42';
+import { buildStructures } from './models.js?v=42';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=42';
+import { Particles, Debris } from './fx.js?v=42';
+import { Input } from './input.js?v=42';
+import { Sfx } from './audio.js?v=42';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=41')).json();
+  const data = await (await fetch('data/campus.json?v=42')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -688,6 +688,7 @@ async function main() {
     // half the salvo climbs twice as high in the same time (50 m vs 100 m; fallback 70 m vs 140 m)
     const cs = k % 2 ? 2 : 1;
     hunters.push({ mesh, p, v: new THREE.Vector3(fwd.x * 8 + Math.cos(sa) * sm, (6 + Math.random() * 2) * cs, fwd.z * 8 + Math.sin(sa) * sm), phase: 'climb', dt: 0, cs,
+      vmax: k % H_PER_SHOT === H_PER_SHOT - 1 ? 190 : H_VMAX, // the last warhead of every salvo is capped at 190 m/s
       topY: (tg.fallback ? S.pos.y : p.y) + tg.climb * cs, st: tg.st, aim: aimPoint(tg.st) || S.pos.clone(), t: 0, speed: 20 });
     sfx.boom(0.12);
   }
@@ -708,7 +709,7 @@ async function main() {
         // dive: home on the aim point, accelerating
         // accelerating dive: the push grows the longer it flies (slow start, then a sharp rush)
         h.dt += dt;
-        h.speed = Math.min(H_VMAX, h.speed + (25 + 220 * h.dt) * dt);
+        h.speed = Math.min(h.vmax, h.speed + (25 + 220 * h.dt) * dt);
         if (aimDead(h.aim)) reaim(h); // its spot was already blown away: pick a standing chunk instead
         const want = tmp.copy(h.aim).sub(h.p).normalize().multiplyScalar(h.speed);
         h.v.lerp(want, Math.min(1, dt * 4));
