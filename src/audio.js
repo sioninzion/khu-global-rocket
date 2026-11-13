@@ -6,7 +6,7 @@ export class Sfx {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     const ctx = this.ctx = new AC();
-    this.master = ctx.createGain(); this.master.gain.value = 0.7; this.master.connect(ctx.destination);
+    this.master = ctx.createGain(); this.master.gain.value = this.muted ? 0 : 0.7; this.master.connect(ctx.destination);
     const len = ctx.sampleRate * 2;
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = this.noise.getChannelData(0);

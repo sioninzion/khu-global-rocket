@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=12';
-import { buildStructures } from './models.js?v=12';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=12';
-import { Particles, Debris } from './fx.js?v=12';
-import { Input } from './input.js?v=12';
-import { Sfx } from './audio.js?v=12';
+import { City } from './buildings.js?v=13';
+import { buildStructures } from './models.js?v=13';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=13';
+import { Particles, Debris } from './fx.js?v=13';
+import { Input } from './input.js?v=13';
+import { Sfx } from './audio.js?v=13';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -27,11 +27,13 @@ function showError(msg) {
 addEventListener('error', (e) => showError('오류: ' + (e.message || e.error)));
 addEventListener('unhandledrejection', (e) => showError('오류: ' + (e.reason && e.reason.message || e.reason)));
 
+const SKILL_ICON = { rocket: '🔥', ballistic: '🎯', bomber: '💣', cluster: '💥', nuke: '☢️', airstrike: '🛰️', blackhole: '🌀' };
+const WEAPON_LABEL = { ballistic: '🎯 탄도미사일', bomber: '💣 폭격 로켓', cluster: '💥 집속탄', nuke: '☢️ 핵폭탄', airstrike: '🛰️ 공중 지원', blackhole: '⚫ 블랙홀 미사일' };
 const KIND = { apartments: '아파트', house: '주택', school: '학교', college: '대학 건물', dormitory: '기숙사', commercial: '상가', retail: '상가', residential: '주거 건물' };
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=12')).json();
+  const data = await (await fetch('data/campus.json?v=13')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -308,6 +310,8 @@ async function main() {
     S.weapon = S.nextWeapon;
     for (const w of Object.keys(crafts)) document.body.classList.toggle(w, S.weapon === w);
     $('skillName').textContent = craft.skill;
+    $('skillIcon').textContent = SKILL_ICON[S.weapon] || '🔥';
+    $('skillBadge').classList.toggle('show', S.weapon === 'bomber');
     if (craft.booster && craft.booster.parent !== craft.group) restoreBooster();
     S.dashed = false; S.dashT = 0; S.prevSkill = false; S.charges = MAX_CHARGES; S.clustered = false;
     rocket.visible = true;
@@ -877,6 +881,16 @@ async function main() {
   }
 
   function updateHud() {
+    // progress toward the next weapon, and fill bars on locked slots
+    const next = Object.entries(UNLOCKS).filter(([w]) => !S.unlocked[w]).sort((a, b) => a[1] - b[1])[0];
+    if (next) {
+      $('nextText').textContent = `다음 해금: ${WEAPON_LABEL[next[0]]} · ${S.score.toLocaleString()}/${next[1].toLocaleString()}`;
+      $('nextBar').style.width = Math.min(100, S.score / next[1] * 100).toFixed(1) + '%';
+    } else {
+      $('nextText').textContent = '모든 무기 해금 완료! 🏆';
+      $('nextBar').style.width = '100%';
+    }
+    for (const [w, need] of Object.entries(UNLOCKS)) if (!S.unlocked[w]) $(WBTN[w]).style.setProperty('--p', Math.min(1, S.score / need).toFixed(3));
     $('score').textContent = S.score.toLocaleString();
     $('down').textContent = S.down;
     $('shots').textContent = S.shots;
@@ -889,6 +903,7 @@ async function main() {
 
   // ------------------------------------------------------------ update
   function update(dt) {
+    if (S.paused) return; // settings panel open
     const inp = input.read();
     S.t += dt;
     if (S.mode === 'pad') {
@@ -1016,9 +1031,9 @@ async function main() {
     $('speed').textContent = Math.round(S.speed * 3.6);
     $('alt').textContent = Math.max(0, Math.round(agl));
     const gauge = S.weapon === 'nuke' || S.weapon === 'blackhole' ? 1 : S.weapon === 'ballistic' ? (S.dashed ? 0 : 1) : S.weapon === 'cluster' ? (S.clustered ? 0 : 1) : S.weapon === 'bomber' ? S.charges / MAX_CHARGES : S.fuel;
-    $('ringFill').style.strokeDashoffset = (289 * (1 - gauge)).toFixed(1);
+    $('boostBtn').style.setProperty('--cd', gauge.toFixed(3));
     $('boostBtn').classList.toggle('empty', S.weapon === 'cluster' ? S.clustered : S.weapon === 'ballistic' ? S.dashed : S.weapon === 'bomber' ? S.charges < 1 : S.fuel < 0.12 && !S.boosting);
-    if (S.weapon === 'bomber') $('skillName').textContent = `폭탄 ×${Math.floor(S.charges)}`;
+    if (S.weapon === 'bomber') { const c = String(Math.floor(S.charges)); if ($('skillBadge').textContent !== c) $('skillBadge').textContent = c; }
   }
 
   function updateCamera(dt) {
@@ -1142,7 +1157,7 @@ async function main() {
     perfAcc = 0; perfN = 0;
     if (fps >= 38) return;
     if (quality === 2 && shadowsOn) {
-      shadowsOn = false; sun.castShadow = false; $('btnShadow').classList.remove('on');
+      shadowsOn = false; sun.castShadow = false; $('optShadow').checked = false;
       toast('부드럽게 돌아가도록 그림자를 껐어요');
     } else {
       renderer.setPixelRatio(1); resize();
@@ -1158,23 +1173,40 @@ async function main() {
     const raw = (now - last) / 1000;
     const dt = Math.min(0.05, raw);
     last = now;
-    if (raw < 0.5) watchPerf(raw);
+    if (raw < 0.5 && !S.paused) watchPerf(raw);
     update(dt);
     drawMini(dt);
     renderFrame();
   });
 
   // ------------------------------------------------------------ UI
-  $('btnInvert').classList.toggle('on', input.invert);
-  $('btnInvert').addEventListener('click', () => { $('btnInvert').classList.toggle('on', input.toggleInvert()); });
-  $('btnShadow').classList.toggle('on', shadowsOn);
-  $('btnShadow').addEventListener('click', () => {
-    shadowsOn = !shadowsOn; sun.castShadow = shadowsOn;
-    $('btnShadow').classList.toggle('on', shadowsOn);
+  // settings panel (pauses the game while open)
+  let muted = false;
+  try { muted = localStorage.getItem('khu-mute') === '1'; } catch { /* ignore */ }
+  if (muted) sfx.toggleMute();
+  $('optShadow').checked = shadowsOn;
+  $('optSound').checked = !muted;
+  $('optInvert').checked = input.invert;
+  $('optShadow').addEventListener('change', (e) => {
+    shadowsOn = e.target.checked; sun.castShadow = shadowsOn;
     try { localStorage.setItem('khu-shadows', shadowsOn ? '1' : '0'); } catch { /* ignore */ }
   });
-  $('btnMute').addEventListener('click', () => { $('btnMute').textContent = sfx.toggleMute() ? '🔇' : '🔊'; });
-  $('btnReset').addEventListener('click', () => { if (confirm('캠퍼스를 복구할까요? (점수 초기화)')) location.reload(); });
+  $('optSound').addEventListener('change', (e) => {
+    if (sfx.muted === e.target.checked) sfx.toggleMute();
+    try { localStorage.setItem('khu-mute', sfx.muted ? '1' : '0'); } catch { /* ignore */ }
+  });
+  $('optInvert').addEventListener('change', (e) => { if (input.invert !== e.target.checked) input.toggleInvert(); });
+  const openSettings = (open) => {
+    $('settings').classList.toggle('open', open);
+    S.paused = open;
+    if (open) { input.resetJoy(); input.boostIds.clear(); input.keys.clear(); $('boostBtn').classList.remove('on'); sfx.engine(false); }
+  };
+  $('btnSettings').addEventListener('click', () => openSettings(true));
+  $('optClose').addEventListener('click', () => openSettings(false));
+  $('settings').addEventListener('click', (e) => { if (e.target === $('settings')) openSettings(false); });
+  addEventListener('keydown', (e) => { if (e.code === 'Escape') openSettings(!S.paused); });
+  $('optReset').addEventListener('click', () => { if (confirm('캠퍼스를 복구할까요? (점수 초기화)')) location.reload(); });
+  updateHud();
   setLoad(`건물 ${city.structures.length}채 · 조각 ${city.totalChunks.toLocaleString()}개 준비 완료`);
   const start = $('start');
   start.disabled = false;
