@@ -1,0 +1,8 @@
+.claude/
+_dev/
+tools/
+보고서.md
+screenshots/
+.git/
+.vercel/
+.env*
