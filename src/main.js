@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { NIGHT } from './facade.js?v=45';
-import { City } from './buildings.js?v=45';
-import { buildStructures } from './models.js?v=45';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=45';
-import { Particles, Debris } from './fx.js?v=45';
-import { Input } from './input.js?v=45';
-import { Sfx } from './audio.js?v=45';
+import { NIGHT } from './facade.js?v=46';
+import { City } from './buildings.js?v=46';
+import { buildStructures } from './models.js?v=46';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=46';
+import { Particles, Debris } from './fx.js?v=46';
+import { Input } from './input.js?v=46';
+import { Sfx } from './audio.js?v=46';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -34,7 +34,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=45')).json();
+  const data = await (await fetch('data/campus.json?v=46')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -335,7 +335,6 @@ async function main() {
     S.nextWeapon = w;
     for (const k in WBTN) $(WBTN[k]).classList.toggle('on', k === w);
     if (S.mode === 'pad' || S.mode === 'title') { const t = S.t; resetRocket(); S.t = t; }
-    else toast(`다음 발사부터 ${crafts[w].name}`);
   }
   for (const w of Object.keys(UNLOCKS)) if (S.unlocked[w]) setUnlocked(w);
   for (const w in WBTN) $(WBTN[w]).addEventListener('click', () => pickWeapon(w));
@@ -399,9 +398,18 @@ async function main() {
     flash.position.copy(p); flash.intensity = 1500;
     S.shake = 1.2;
     sfx.boom(0.45);
-    toast('🎯 분리! 돌진');
   }
 
+  // destroyed-chunk counter: "×1,234", adds up while things keep breaking, fades 1.4 s after the last hit
+  let comboN = 0, comboTimer = 0;
+  function addCombo(n) {
+    comboN += n;
+    const el = $('combo');
+    el.textContent = `×${comboN.toLocaleString()}`;
+    el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop', 'show');
+    clearTimeout(comboTimer);
+    comboTimer = setTimeout(() => { el.classList.remove('show'); comboN = 0; }, 1400);
+  }
   function toast(msg, big = false) {
     const el = $('toast');
     el.textContent = msg;
@@ -475,10 +483,11 @@ async function main() {
     S.shake = Math.max(S.shake, quiet ? 0.5 : 1.4 + power + (big - 1) * 1.2);
     const n = killedN + fallenN;
     S.score += n;
+    if (n > 0) addCombo(n);
     let downMsg = null;
     for (const s of new Set(res.map(r => r.b.owner))) {
       const alive = s.parts.reduce((t, q) => t + q.aliveCount, 0);
-      if (!downSet.has(s) && alive / s.total < 0.15) { downSet.add(s); S.down++; downMsg = `${s.name || KIND[s.kind] || '건물'} 붕괴! 💥`; }
+      if (!downSet.has(s) && alive / s.total < 0.15) { downSet.add(s); S.down++; downMsg = `${s.name || KIND[s.kind] || '건물'} 붕괴!`; }
     }
     checkUnlocks();
     updateHud();
@@ -499,18 +508,7 @@ async function main() {
       // plain impact: 100 m; drill dive: 0.7x the height it fell
       const qr = S.drill ? Math.max(20, 0.7 * (S.drillY0 - p.y)) : 100;
       startQuake(p, qr); S.boomTime = QUAKE_TIME + 2.5; S.boomScale = 4.2; }
-    let msg;
-    if (main) {
-      const b = main.b;
-      msg = downMsg ? `${downMsg} ${n}조각` : `${b.name || KIND[b.kind] || '건물'} 명중! ${n}조각 파괴`;
-    } else {
-      msg = hitB === null && S.outOfBounds ? '범위를 벗어났어요' : n ? `${n}조각 파괴` : '지면 충돌!';
-    }
-    if (S.weapon === 'nuke') msg = `☢️ 핵폭발! ${n.toLocaleString()}조각 파괴`;
-    if (S.weapon === 'airstrike') msg = `🛰️ 공중 지원 요청! ${msg}`;
-    if (S.weapon === 'blackhole') msg = '⚫ 특이점 전개!';
-    if (S.weapon === 'quake') msg = `🌋 지진 발생! 반경 ${Math.round(quake.R)}m`;
-    toast(msg, !!main || S.weapon === 'nuke');
+    if (downMsg) toast(downMsg, true);
     S.mode = 'boom'; S.t = 0; S.boomPos.copy(p);
     S.orbit = Math.atan2(camera.position.x - p.x, camera.position.z - p.z);
     rocket.visible = false;
@@ -610,7 +608,6 @@ async function main() {
       lzTick = 1 / 18; // hits 18 times a second
       const { n, main, downMsg } = blast(o.clone(), BEAM_CUT_R, 0.8, null, true, false, false, null, { ox: o.x, oy: o.y, oz: o.z, dx: fwd.x, dy: fwd.y, dz: fwd.z, len });
       if (downMsg) toast(downMsg, true);
-      else if (main && n > 6) toast(`🔴 ${main.b.name || KIND[main.b.kind] || '건물'} 절단!`);
     }
   }
 
@@ -671,11 +668,10 @@ async function main() {
   // one press: a salvo of H_PER_SHOT warheads, H_GAP seconds apart (alternating left/right)
   function fireHunter() {
     const tg = pickTarget();
-    if (!tg) { toast('남은 건물이 없어요'); return; }
+    if (!tg) return;
     S.hCharges -= 1;
     if (!(S.hQueue > 0)) S.hQTimer = 0;
     S.hQueue = (S.hQueue || 0) + H_PER_SHOT;
-    toast(`🧨 탄두 ${H_PER_SHOT}발 발사${tg.fallback ? ' (범위 밖, 고공 강하)' : ''}`);
   }
   function launchWarhead(k) {
     const tg = pickTarget();
@@ -742,7 +738,6 @@ async function main() {
         if (!done) continue;
         const { n, main, downMsg } = blast(h.p.clone(), H_R, 0.7, hit ? hit.b : null, true);
         if (downMsg) toast(downMsg, true);
-        else if (main && n) toast(`🧨 ${main.b.name || KIND[main.b.kind] || '건물'} +${n}조각`);
       }
     }
   }
@@ -792,7 +787,6 @@ async function main() {
     }
     if (t > QUAKE_TIME) {
       quake.on = false; quakeRing.visible = false;
-      toast(`🌋 지진! ${quake.n.toLocaleString()}조각 붕괴`, true);
     }
   }
 
@@ -868,7 +862,7 @@ async function main() {
     const want = Math.min(BH_RMAX, (BH_R0 + BH_EAT * Math.sqrt(bh.n)) * g3);
     bh.r += (want - bh.r) * Math.min(1, dt * 2.5);
     S.boomScale = Math.max(2.3, bh.r / 24);
-    if (bh.r > 40 + bh.step * 20) { bh.step++; toast(`⚫ 블랙홀 반경 ${Math.round(bh.r)}M`, true); }
+    if (bh.r > 40 + bh.step * 20) bh.step++;
     bh.core = 1.2 + bh.r * 0.14;
     bh.lens = g3;
     bhCore.scale.setScalar(bh.core);
@@ -920,7 +914,6 @@ async function main() {
         }
         sfx.boom(1.4);
         S.shake = 3.2;
-        toast(`⚫ 블랙홀이 ${bh.n.toLocaleString()}조각을 삼켰어요`, true);
         bh.on = false;
       }
     }
@@ -987,7 +980,6 @@ async function main() {
   function startLaser(p) {
     Object.assign(laser, { on: true, t: 0, x: p.x, z: p.z, gy: terrain.height(p.x, p.z), n: 0, tick: 0, r: 0 });
     beam.position.set(p.x, laser.gy, p.z); beam.visible = false;
-    setTimeout(() => toast('🛰️ 위성 조준 완료…'), 300);
   }
   function updateLaser(dt) {
     if (!laser.on) return;
@@ -1025,7 +1017,6 @@ async function main() {
     }
     if (t > 3.6) {
       laser.on = false; beam.visible = false;
-      toast(`🛰️ 공중 지원! 빔 안의 ${laser.n.toLocaleString()}조각 소멸`, true);
     }
   }
 
@@ -1094,11 +1085,9 @@ async function main() {
     S.mode = 'cluster'; S.t = 0;
     S.clusterN = 0; S.clusterHits = 0; S.clusterDone = 0; S.clusterSum = new THREE.Vector3();
     S.clusterDir = f; S.clusterFrom = p.clone();
-    toast('💥 분열!');
   }
   function endCluster() {
     const c = S.clusterDone ? S.clusterSum.clone().divideScalar(S.clusterDone) : S.pos.clone();
-    toast(`💥 집속탄 ${S.clusterHits}발 명중! ${S.clusterN}조각 파괴`, S.clusterN > 0);
     S.mode = 'boom'; S.t = 0; S.boomPos.copy(c);
     S.orbit = Math.atan2(camera.position.x - c.x, camera.position.z - c.z);
     S.shots++;
@@ -1158,7 +1147,6 @@ async function main() {
           S.clusterSum.add(b.pos);
           if (downMsg) toast(downMsg, true);
         } else if (downMsg) toast(downMsg, true);
-        else if (main && n) toast(`💣 ${main.b.name || KIND[main.b.kind] || '건물'} +${n}조각`);
       }
     }
   }
@@ -1197,8 +1185,6 @@ async function main() {
       if (left <= 0) {
         S.mode = 'flight'; S.t = 0; S.speed = 6; S.outOfBounds = false;
         setFlames(true);
-        toast(S.firstLaunch ? '발사! 왼쪽으로 조종, 오른쪽은 스킬'
-          : S.weapon === 'ballistic' ? '탄도미사일 발사! 스킬을 누르면 그 방향으로 돌진' : '발사!');
         S.firstLaunch = false;
         for (let i = 0; i < 40; i++) smoke.spawn(pad.x + (Math.random() - 0.5) * 4, padTop, pad.z + (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 20, Math.random() * 3, (Math.random() - 0.5) * 20, 4, 14, 3 + Math.random() * 2, 0.85, 0.85, 0.83, 0.8, 0.95, 0.5);
       }
@@ -1244,7 +1230,7 @@ async function main() {
           S.fuel = clamp(S.fuel + (S.firing ? -0.17 : 0.12 * 1.8) * dt, 0, 1); // half the drain, 1.8x recharge
         } else if (S.weapon === 'quake') {
           S.boosting = false;
-          if (skillPress && S.t > 0.3) { S.drill = true; S.drillY0 = S.pos.y; toast('⛏️ 드릴 강하!'); sfx.boom(0.3); }
+          if (skillPress && S.t > 0.3) { S.drill = true; S.drillY0 = S.pos.y; sfx.boom(0.3); }
         } else if (S.weapon === 'blackhole') {
           S.boosting = false;
           if (skillPress && S.t > 0.3) { explode(null); }
@@ -1480,10 +1466,8 @@ async function main() {
     if (fps >= 38) return;
     if (quality === 2 && shadowsOn) {
       shadowsOn = false; sun.castShadow = false; $('optShadow').checked = false;
-      toast('부드럽게 돌아가도록 그림자를 껐어요');
     } else {
       renderer.setPixelRatio(1); resize();
-      toast('부드럽게 돌아가도록 해상도를 낮췄어요');
       quality = 0; return;
     }
     quality = 1;

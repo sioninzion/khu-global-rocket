@@ -70,6 +70,12 @@
   #toast.big { font-size: 22px; color: var(--gold-2); background: linear-gradient(90deg, transparent, rgba(150,24,30,.85) 14%, rgba(150,24,30,.85) 86%, transparent); border-color: var(--gold); }
   #toast.show { animation: toast 2.6s ease forwards; }
   @keyframes toast { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.9); } 10% { opacity: 1; transform: translate(-50%, 0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -10px); } }
+  #combo { top: 29%; left: 50%; transform: translateX(-50%); font: 30px/1 var(--display); color: var(--gold); letter-spacing: 1px;
+    -webkit-text-stroke: 2px rgba(0,0,0,.45); text-shadow: 0 3px 0 rgba(0,0,0,.35); opacity: 0; transition: opacity .35s; white-space: nowrap; }
+  #combo.show { opacity: 1; }
+  #combo.pop { animation: cpop .18s ease-out; }
+  @keyframes cpop { 0% { transform: translateX(-50%) scale(1.25); } 100% { transform: translateX(-50%) scale(1); } }
+  @media (max-aspect-ratio: 1/1) { #combo { top: 36%; } }
   #flash { position: fixed; inset: 0; z-index: 5; background: #fff; opacity: 0; pointer-events: none; }
   #flash.go { animation: nflash 2.4s ease-out forwards; }
   @keyframes nflash { 0% { opacity: 1; } 15% { opacity: .95; } 100% { opacity: 0; } }
@@ -216,6 +222,7 @@
 </div>
 <div id="center" class="hud"></div>
 <div id="toast" class="hud"></div>
+<div id="combo" class="hud"></div>
 <div id="flash"></div>
 <div id="portrait">📱 가로로 돌리면 더 넓게 보여요</div>
 
@@ -266,6 +273,6 @@
   </div>
 </div>
 
-<script type="module" src="src/main.js?v=45"></script>
+<script type="module" src="src/main.js?v=46"></script>
 </body>
 </html>
