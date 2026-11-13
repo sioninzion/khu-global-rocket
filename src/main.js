@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=25';
-import { buildStructures } from './models.js?v=25';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=25';
-import { Particles, Debris } from './fx.js?v=25';
-import { Input } from './input.js?v=25';
-import { Sfx } from './audio.js?v=25';
+import { City } from './buildings.js?v=26';
+import { buildStructures } from './models.js?v=26';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=26';
+import { Particles, Debris } from './fx.js?v=26';
+import { Input } from './input.js?v=26';
+import { Sfx } from './audio.js?v=26';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=25')).json();
+  const data = await (await fetch('data/campus.json?v=26')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -611,9 +611,9 @@ async function main() {
   }
 
   // ------------------------------------------------------------ guided bomber: each skill press launches a warhead
-  // that climbs slowly, picks a random building 400-1000 m ahead (within 100 degrees of the heading) and dives on it.
-  // With nothing in that cone it climbs 140 m above the carrier and dives on the nearest building still standing.
-  const H_MAX = 4, H_RELOAD = 1.4, H_R = 14, H_MIN = 400, H_MAXD = 1000, H_HALF = THREE.MathUtils.degToRad(50);
+  // that climbs slowly, picks a random building 200-800 m ahead (within 80 degrees of the heading) and dives on it.
+  // With nothing in that cone it climbs 70 m above the carrier and dives on the nearest building still standing.
+  const H_MAX = 4, H_RELOAD = 0.6, H_R = 14, H_MIN = 200, H_MAXD = 800, H_HALF = THREE.MathUtils.degToRad(40), H_VMAX = 80; // 80-degree cone, warheads top out at 80 m/s
   const hunters = [];
   const hunterGeo = new THREE.ConeGeometry(0.28, 1.6, 8); hunterGeo.rotateX(-Math.PI / 2);
   const hunterMat = new THREE.MeshLambertMaterial({ color: 0xff8a1e });
@@ -643,8 +643,8 @@ async function main() {
       if (d < H_MIN || d > H_MAXD) continue;
       if (Math.acos(Math.max(-1, Math.min(1, (dx * hx + dz * hz) / d))) <= H_HALF) inCone.push(st);
     }
-    if (inCone.length) return { st: inCone[Math.floor(Math.random() * inCone.length)], climb: 100 };
-    return nearest ? { st: nearest, climb: 140, fallback: true } : null;
+    if (inCone.length) return { st: inCone[Math.floor(Math.random() * inCone.length)], climb: 50 };
+    return nearest ? { st: nearest, climb: 70, fallback: true } : null;
   }
   function fireHunter() {
     const tg = pickTarget();
@@ -667,7 +667,7 @@ async function main() {
       if (h.phase === 'climb') {
         // slow lift-off straight up to the release height
         h.v.x *= Math.exp(-dt * 1.5); h.v.z *= Math.exp(-dt * 1.5);
-        h.v.y = Math.max(h.v.y, 32); // ~3 s to rise 100 m
+        h.v.y = Math.max(h.v.y, 24); // ~2 s to rise 50 m
         if (h.p.y >= h.topY || h.t > 8) {
           h.phase = 'dive';
           if (h.st.parts.every(b => b.aliveCount <= 0)) { const tg = pickTarget(); if (tg) { h.st = tg.st; } }
@@ -675,7 +675,7 @@ async function main() {
         }
       } else {
         // dive: home on the aim point, accelerating
-        h.speed = Math.min(220, h.speed + 140 * dt);
+        h.speed = Math.min(H_VMAX, h.speed + 90 * dt);
         const want = tmp.copy(h.aim).sub(h.p).normalize().multiplyScalar(h.speed);
         h.v.lerp(want, Math.min(1, dt * 4));
       }
