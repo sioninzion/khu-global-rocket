@@ -174,7 +174,11 @@
     #btnSettings { left: auto; right: calc(170px + var(--safe-r)); }
     #stats { min-width: 0; }
   }
-  @media (max-width: 440px) { #weapons button { width: 40px; height: 48px; } #weapons button i { font-size: 17px; } #weapons .ws { font-size: 9px; } #weapons small { font-size: 7.5px; } #weapons { gap: 3px; padding: 4px; } }
+  /* phones (touch): smaller weapon slots */
+  @media (pointer: coarse) { #weapons button { width: 40px; height: 44px; padding-top: 3px; } #weapons button i { font-size: 16px; } #weapons .ws { font-size: 8.5px; margin-top: 1px; }
+    #weapons small { font-size: 7px; bottom: 1px; } #weapons button.locked::after { bottom: 11px; height: 2px; } #weapons { gap: 3px; padding: 4px; } }
+  @media (pointer: coarse) and (max-width: 440px) { #weapons button { width: 34px; height: 40px; } #weapons button i { font-size: 14px; } #weapons .ws { font-size: 8px; } #weapons small { font-size: 6.5px; } }
+  @media (pointer: fine) and (max-width: 440px) { #weapons button { width: 40px; height: 48px; } #weapons button i { font-size: 17px; } #weapons .ws { font-size: 9px; } #weapons small { font-size: 7.5px; } #weapons { gap: 3px; padding: 4px; } }
 </style>
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
@@ -247,6 +251,6 @@
   </div>
 </div>
 
-<script type="module" src="src/main.js?v=17"></script>
+<script type="module" src="src/main.js?v=18"></script>
 </body>
 </html>

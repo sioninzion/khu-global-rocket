@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=17';
-import { buildStructures } from './models.js?v=17';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=17';
-import { Particles, Debris } from './fx.js?v=17';
-import { Input } from './input.js?v=17';
-import { Sfx } from './audio.js?v=17';
+import { City } from './buildings.js?v=18';
+import { buildStructures } from './models.js?v=18';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=18';
+import { Particles, Debris } from './fx.js?v=18';
+import { Input } from './input.js?v=18';
+import { Sfx } from './audio.js?v=18';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=17')).json();
+  const data = await (await fetch('data/campus.json?v=18')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
