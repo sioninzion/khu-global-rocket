@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=33';
-import { buildStructures } from './models.js?v=33';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=33';
-import { Particles, Debris } from './fx.js?v=33';
-import { Input } from './input.js?v=33';
-import { Sfx } from './audio.js?v=33';
+import { City } from './buildings.js?v=34';
+import { buildStructures } from './models.js?v=34';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=34';
+import { Particles, Debris } from './fx.js?v=34';
+import { Input } from './input.js?v=34';
+import { Sfx } from './audio.js?v=34';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=33')).json();
+  const data = await (await fetch('data/campus.json?v=34')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -700,7 +700,9 @@ async function main() {
       }
       h.mesh.position.copy(h.p);
       h.mesh.lookAt(tmp.copy(h.p).add(h.v));
-      for (let j = 0; j < 3; j++) { // trail: 3 puffs per frame, spread along this frame's path
+      // trail: 3 puffs per frame, spread along this frame's path; for the first second only 1/4 of that
+      const puffs = h.t < 1 ? (Math.random() < 0.75 ? 1 : 0) : 3;
+      for (let j = 0; j < puffs; j++) {
         const f = j / 3;
         const tx = h.p.x - h.v.x * dt * f, ty = h.p.y - h.v.y * dt * f, tz = h.p.z - h.v.z * dt * f;
         fire.spawn(tx, ty, tz, -h.v.x * 0.1, -h.v.y * 0.1, -h.v.z * 0.1, h.phase === 'dive' ? 1.6 : 1.0, 1, 0.25, 1, 0.65, 0.25, 1, 0.94, 0);
