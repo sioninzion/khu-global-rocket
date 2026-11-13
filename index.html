@@ -62,6 +62,7 @@
   @media (max-aspect-ratio: 1/1) { #weapons { width: 94vw; } #toast { top: 30%; } }
   @media (min-aspect-ratio: 1/1) and (max-height: 500px) { #toast { top: 30%; } }
   body.nuke #boostBtn { background: radial-gradient(circle at 50% 35%, #ffe066, #c99a00 70%); color: #1e1f1c; }
+  body.blackhole #boostBtn { background: radial-gradient(circle at 50% 35%, #b07dff, #1c1030 70%); box-shadow: 0 0 22px rgba(160,100,255,.6); }
   body.airstrike #boostBtn { background: radial-gradient(circle at 50% 35%, #7ff6ff, #127f99 70%); }
   #flash { position: fixed; inset: 0; z-index: 5; background: #fff; opacity: 0; pointer-events: none; }
   #flash.go { animation: nflash 2.4s ease-out forwards; }
@@ -126,6 +127,7 @@
   <button id="wCluster" class="locked">💥 <span class="wl">집속탄</span><span class="ws">집속</span> <small>🔒3400</small></button>
   <button id="wNuke" class="locked">☢️ <span class="wl">핵폭탄</span><span class="ws">핵</span> <small>🔒7000</small></button>
   <button id="wAir" class="locked">🛰️ <span class="wl">공중 지원</span><span class="ws">지원</span> <small>🔒12000</small></button>
+  <button id="wBlack" class="locked">⚫ <span class="wl">블랙홀</span><span class="ws">블랙홀</span> <small>🔒20000</small></button>
 </div>
 <div id="boostWrap"><div id="boostBtn">스킬<small id="skillName">부스트</small></div><div id="boostBar"><div id="boostFill"></div></div></div>
 <div id="btns">
@@ -149,6 +151,6 @@
   </div>
 </div>
 
-<script type="module" src="src/main.js?v=8"></script>
+<script type="module" src="src/main.js?v=9"></script>
 </body>
 </html>

@@ -70,6 +70,7 @@ export class Debris {
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.mesh.castShadow = true;
+    this.attract = null; // {x, y, z, k}: black-hole pull
     this.items = [];
     for (let i = 0; i < cap; i++) this.items.push({ on: false, p: new THREE.Vector3(), v: new THREE.Vector3(), q: new THREE.Quaternion(), w: new THREE.Vector3(), s: new THREE.Vector3(), t: 0 });
     this.m = new THREE.Matrix4(); this.zero = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -93,7 +94,19 @@ export class Debris {
       if (!it.on) continue;
       any = true;
       it.t += dt;
-      it.v.y -= 22 * dt;
+      const A = this.attract;
+      if (A) {
+        const dx = A.x - it.p.x, dy = A.y - it.p.y, dz = A.z - it.p.z;
+        const d = Math.hypot(dx, dy, dz);
+        if (d < 3) { it.on = false; this.mesh.setMatrixAt(i, this.zero); continue; } // swallowed
+        if (d < 260) {
+          const f = A.k / (1 + d * 0.04) * dt / d;
+          it.v.x += dx * f - dz * f * 0.6; it.v.y += dy * f; it.v.z += dz * f + dx * f * 0.6;
+          it.v.multiplyScalar(Math.exp(-dt * 0.9));
+          it.s.multiplyScalar(Math.exp(-dt * (d < 40 ? 0.8 : 0.1))); // stretched and crushed
+          it.t = Math.min(it.t, 1);
+        } else it.v.y -= 22 * dt;
+      } else it.v.y -= 22 * dt;
       it.p.addScaledVector(it.v, dt);
       const gy = this.terrain.height(it.p.x, it.p.z);
       const half = it.s.y * 0.35;
