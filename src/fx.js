@@ -75,6 +75,7 @@ export class Debris {
     for (let i = 0; i < cap; i++) this.items.push({ on: false, p: new THREE.Vector3(), v: new THREE.Vector3(), q: new THREE.Quaternion(), w: new THREE.Vector3(), s: new THREE.Vector3(), t: 0 });
     this.m = new THREE.Matrix4(); this.zero = new THREE.Matrix4().makeScale(0, 0, 0);
     this.dq = new THREE.Quaternion(); this.e = new THREE.Euler(); this.tmpS = new THREE.Vector3();
+    this.dir = new THREE.Vector3(); this.zAxis = new THREE.Vector3(0, 0, 1);
     for (let i = 0; i < cap; i++) { this.mesh.setMatrixAt(i, this.zero); this.mesh.setColorAt(i, new THREE.Color(1, 1, 1)); }
     scene.add(this.mesh);
   }
@@ -103,8 +104,9 @@ export class Debris {
           const f = A.k / (1 + d * 0.04) * dt / d;
           it.v.x += dx * f - dz * f * 0.6; it.v.y += dy * f; it.v.z += dz * f + dx * f * 0.6;
           it.v.multiplyScalar(Math.exp(-dt * 0.9));
-          it.s.multiplyScalar(Math.exp(-dt * (d < 40 ? 0.8 : 0.1))); // stretched and crushed
           it.t = Math.min(it.t, 1);
+          // tidal forces: stretched along the pull, squeezed across it
+          it.tidal = Math.min(6, 1 + 260 / (d * d * 0.25 + 40));
         } else it.v.y -= 22 * dt;
       } else it.v.y -= 22 * dt;
       it.p.addScaledVector(it.v, dt);
@@ -115,12 +117,20 @@ export class Debris {
         if (it.v.y < 0) it.v.y *= -0.25;
         it.v.x *= 0.6; it.v.z *= 0.6; it.w.multiplyScalar(0.6);
       }
-      this.e.set(it.w.x * dt, it.w.y * dt, it.w.z * dt);
-      this.dq.setFromEuler(this.e); it.q.multiply(this.dq);
+      if (A && it.tidal > 1.05) {
+        this.dir.set(A.x - it.p.x, A.y - it.p.y, A.z - it.p.z).normalize();
+        this.dq.setFromUnitVectors(this.zAxis, this.dir);
+        it.q.slerp(this.dq, Math.min(1, dt * 6));
+      } else {
+        this.e.set(it.w.x * dt, it.w.y * dt, it.w.z * dt);
+        this.dq.setFromEuler(this.e); it.q.multiply(this.dq);
+      }
       let sc = 1;
       if (it.t > it.life) sc = Math.max(0, 1 - (it.t - it.life) / 1.5);
       if (sc <= 0) { it.on = false; this.mesh.setMatrixAt(i, this.zero); continue; }
       this.tmpS.copy(it.s).multiplyScalar(sc);
+      if (A && it.tidal > 1.05) { const q = 1 / Math.sqrt(it.tidal); this.tmpS.x *= q; this.tmpS.y *= q; this.tmpS.z *= it.tidal; }
+      else it.tidal = 1;
       this.m.compose(it.p, it.q, this.tmpS);
       this.mesh.setMatrixAt(i, this.m);
     }

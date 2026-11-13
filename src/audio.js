@@ -47,6 +47,33 @@ export class Sfx {
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.6, t + 0.3); g.gain.exponentialRampToValueAtTime(0.001, t + 2.5);
     src.connect(f).connect(g).connect(this.master); src.start(t); src.stop(t + 2.6);
   }
+  // deep rising hum while a black hole exists
+  drone(on) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if (on && !this.dr) {
+      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator();
+      o1.type = 'sawtooth'; o2.type = 'sine';
+      o1.frequency.value = 38; o2.frequency.value = 57;
+      const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 180;
+      const g = ctx.createGain(); g.gain.value = 0.0001;
+      o1.connect(f); o2.connect(f); f.connect(g).connect(this.master);
+      o1.start(); o2.start();
+      this.dr = { o1, o2, f, g };
+    } else if (!on && this.dr) {
+      const d = this.dr; this.dr = null;
+      d.g.gain.setTargetAtTime(0.0001, t, 0.05);
+      d.o1.stop(t + 0.4); d.o2.stop(t + 0.4);
+    }
+  }
+  droneLevel(x) {
+    if (!this.dr) return;
+    const t = this.ctx.currentTime;
+    this.dr.g.gain.setTargetAtTime(0.05 + 0.4 * x, t, 0.1);
+    this.dr.o1.frequency.setTargetAtTime(38 - 14 * x, t, 0.2);
+    this.dr.o2.frequency.setTargetAtTime(57 - 22 * x, t, 0.2);
+    this.dr.f.frequency.setTargetAtTime(180 + 260 * x, t, 0.2);
+  }
   toggleMute() {
     this.muted = !this.muted;
     if (this.master) this.master.gain.value = this.muted ? 0 : 0.7;

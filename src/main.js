@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=9';
-import { buildStructures } from './models.js?v=9';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=9';
-import { Particles, Debris } from './fx.js?v=9';
-import { Input } from './input.js?v=9';
-import { Sfx } from './audio.js?v=9';
+import { City } from './buildings.js?v=10';
+import { buildStructures } from './models.js?v=10';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=10';
+import { Particles, Debris } from './fx.js?v=10';
+import { Input } from './input.js?v=10';
+import { Sfx } from './audio.js?v=10';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -31,7 +31,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=9')).json();
+  const data = await (await fetch('data/campus.json?v=10')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -42,7 +42,8 @@ async function main() {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0xc9dbe8, 350, 2600);
   const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 9000);
-  scene.add(new THREE.HemisphereLight(0xe4f0ff, 0x6a7352, 1.15));
+  const hemi = new THREE.HemisphereLight(0xe4f0ff, 0x6a7352, 1.15);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff0dc, 2.9);
   const SUN_DIR = new THREE.Vector3(0.45, 0.55, -0.7).normalize();
   sun.position.copy(SUN_DIR).multiplyScalar(100);
@@ -515,48 +516,97 @@ async function main() {
     if (t > 7) { nuke.on = false; fireball.visible = shock.visible = false; }
   }
 
-  // ------------------------------------------------------------ black hole: grows, swallows everything in reach, then collapses
-  const BH_R = 60, BH_TIME = 4.5;
-  const bh = { on: false, t: 0, p: new THREE.Vector3(), n: 0, tick: 0, r: 0 };
+  // ------------------------------------------------------------ black hole
+  // A dark event horizon, a hot Keplerian accretion disk, gravitational lensing of
+  // the whole screen around it, tidal "spaghettification" of everything it pulls in,
+  // a dimming world and a rising drone; it ends in a collapse and a shockwave.
+  const BH_R = 60, BH_TIME = 5.0;
+  const bh = { on: false, t: 0, p: new THREE.Vector3(), n: 0, tick: 0, r: 0, core: 0, lens: 0, gy: 0 };
   const bhCore = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), new THREE.MeshBasicMaterial({ color: 0x000000, fog: false }));
-  const bhGlow = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), addMat(0x7a3cff)); bhGlow.material.side = THREE.BackSide;
-  const bhDisk = new THREE.Mesh(new THREE.RingGeometry(1.25, 2.6, 64, 1), addMat(0xff9a4a)); bhDisk.material.side = THREE.DoubleSide;
-  const bhDisk2 = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.7, 64, 1), addMat(0xc78bff)); bhDisk2.material.side = THREE.DoubleSide;
-  const bhGroup = new THREE.Group(); bhGroup.add(bhGlow, bhCore, bhDisk, bhDisk2); bhGroup.visible = false; scene.add(bhGroup);
+  const diskMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
+    uniforms: { uTime: { value: 0 }, uInner: { value: 1.25 }, uOuter: { value: 3.6 }, uFade: { value: 1 } },
+    vertexShader: `varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform float uTime, uInner, uOuter, uFade; varying vec2 vP;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+      float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+        return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }
+      void main(){
+        float r = length(vP); float t = clamp((r - uInner) / (uOuter - uInner), 0.0, 1.0);
+        float a = atan(vP.y, vP.x);
+        float w = uTime * 2.6 / pow(max(r, 0.5), 1.5);         // inner orbits spin faster (Kepler)
+        float s = a + w;
+        float bands = n2(vec2(t * 14.0, s * 2.0)) * 0.6 + n2(vec2(t * 40.0, s * 6.0)) * 0.4;
+        vec3 hot = vec3(1.0, 0.97, 0.9), mid = vec3(1.0, 0.62, 0.22), cool = vec3(0.65, 0.18, 0.08);
+        vec3 col = mix(hot, mid, smoothstep(0.0, 0.35, t)); col = mix(col, cool, smoothstep(0.35, 1.0, t));
+        float doppler = 0.55 + 0.75 * (0.5 + 0.5 * sin(a));    // approaching side looks brighter
+        float alpha = smoothstep(0.0, 0.06, t) * (1.0 - smoothstep(0.65, 1.0, t)) * (0.45 + 0.75 * bands) * doppler * uFade;
+        gl_FragColor = vec4(col * (1.4 - t), alpha);
+      }`,
+  });
+  const bhDisk = new THREE.Mesh(new THREE.RingGeometry(1.25, 3.6, 128, 4), diskMat);
+  const bhShock = new THREE.Mesh(new THREE.TorusGeometry(1, 0.04, 6, 64), addMat(0xc59bff));
+  bhShock.rotation.x = Math.PI / 2; bhShock.visible = false; scene.add(bhShock);
+  const bhGroup = new THREE.Group(); bhGroup.add(bhCore, bhDisk); bhGroup.visible = false; scene.add(bhGroup);
+  const bhHemi = { base: hemi.intensity, sun: sun.intensity };
   function startBlackHole(p) {
-    Object.assign(bh, { on: true, t: 0, n: 0, tick: 0, r: 0 });
+    Object.assign(bh, { on: true, t: 0, n: 0, tick: 0, r: 0, lens: 0, shockT: -1 });
     bh.p.copy(p);
-    bh.p.y = Math.max(p.y, terrain.height(p.x, p.z) + 6);
     bh.gy = terrain.height(p.x, p.z);
-    bhGroup.position.copy(bh.p); bhGroup.visible = true;
+    bh.p.y = Math.max(p.y, bh.gy + 6);
+    bhGroup.position.copy(bh.p); bhGroup.visible = true; bhGroup.scale.setScalar(1);
     debris.attract = { x: bh.p.x, y: bh.p.y, z: bh.p.z, k: 0 };
-    sfx.rumble(); setTimeout(() => sfx.rumble(), 1200); setTimeout(() => sfx.rumble(), 2400);
+    sfx.drone(true);
   }
   function updateBlackHole(dt) {
-    if (!bh.on) return;
+    // shockwave after the collapse
+    if (bh.shockT >= 0) {
+      bh.shockT += dt;
+      const r = 10 + bh.shockT * 220;
+      bhShock.scale.set(r, r, r * 4);
+      bhShock.material.opacity = Math.max(0, 1 - bh.shockT / 1.3);
+      if (bh.shockT > 1.3) { bh.shockT = -1; bhShock.visible = false; }
+    }
+    // the world brightens back after the collapse
+    if (!bh.on) {
+      hemi.intensity += (bhHemi.base - hemi.intensity) * Math.min(1, dt * 2);
+      sun.intensity += (bhHemi.sun - sun.intensity) * Math.min(1, dt * 2);
+      bh.lens = Math.max(0, bh.lens - dt * 3);
+      return;
+    }
     bh.t += dt;
     const t = bh.t;
-    // the singularity sinks toward the ground so whole buildings fall into it
+    // sink toward the ground so whole buildings fall in
     bh.p.y += (bh.gy + 18 - bh.p.y) * Math.min(1, dt * 1.2);
     bhGroup.position.copy(bh.p);
     if (debris.attract) debris.attract.y = bh.p.y;
-    const grow = Math.min(1, t / 2.6);
-    bh.r = BH_R * grow * grow * (3 - 2 * grow);
-    const core = 1.5 + bh.r * 0.16;
-    bhCore.scale.setScalar(core);
-    bhGlow.scale.setScalar(core * 1.35);
-    bhGlow.material.opacity = 0.35 + 0.15 * Math.sin(t * 12);
-    bhDisk.scale.setScalar(core * 1.6); bhDisk2.scale.setScalar(core * 1.6);
-    bhDisk.rotation.set(Math.PI / 2 + 0.35, 0, t * 2.2);
-    bhDisk2.rotation.set(Math.PI / 2 - 0.2, 0.3, -t * 3.1);
-    debris.attract.k = 180 + bh.r * 6;
-    S.shake = Math.max(S.shake, 0.6 + grow);
-    // matter spiralling in
-    for (let i = 0; i < 8; i++) {
-      const a = Math.random() * 6.28, rr = bh.r * (1 + Math.random() * 0.6) + 6;
-      const x = bh.p.x + Math.cos(a) * rr, z = bh.p.z + Math.sin(a) * rr, y = bh.p.y + (Math.random() - 0.5) * rr * 0.4;
-      const sp = 14 + bh.r * 0.5;
-      fire.spawn(x, y, z, (-Math.cos(a) - Math.sin(a) * 1.2) * sp, (bh.p.y - y) * 0.8, (-Math.sin(a) + Math.cos(a) * 1.2) * sp, 1.2, -0.8, 0.8, 0.7, 0.45, 1, 1, 0.99, 0);
+    const grow = Math.min(1, t / 2.8);
+    const g3 = grow * grow * (3 - 2 * grow);
+    bh.r = BH_R * g3;
+    bh.core = 1.2 + bh.r * 0.14;
+    bh.lens = g3;
+    bhCore.scale.setScalar(bh.core);
+    bhDisk.scale.setScalar(bh.core);
+    bhDisk.rotation.set(Math.PI / 2 - 0.22, 0, 0); // nearly edge-on: lensing bends the far side over the top
+    diskMat.uniforms.uTime.value = t;
+    debris.attract.k = 180 + bh.r * 7;
+    S.shake = Math.max(S.shake, 0.4 + grow * 0.9);
+    // light itself is being swallowed
+    hemi.intensity = bhHemi.base * (1 - 0.45 * g3);
+    sun.intensity = bhHemi.sun * (1 - 0.5 * g3);
+    sfx.droneLevel(g3);
+    // gas spiralling in along the disk plane, and dust swirling off the ground
+    for (let i = 0; i < 10; i++) {
+      const a = Math.random() * 6.28, rr = bh.core * (2.4 + Math.random() * 2.5);
+      const x = bh.p.x + Math.cos(a) * rr, z = bh.p.z + Math.sin(a) * rr, y = bh.p.y + (Math.random() - 0.5) * bh.core * 0.3;
+      const sp = 18 + bh.r * 0.5;
+      fire.spawn(x, y, z, (-Math.cos(a) * 0.5 - Math.sin(a) * 1.4) * sp, 0, (-Math.sin(a) * 0.5 + Math.cos(a) * 1.4) * sp, 1.1, -0.9, 0.6, 1, 0.6, 0.25, 0.9, 0.985, 0);
+    }
+    for (let i = 0; i < 5; i++) {
+      const a = Math.random() * 6.28, rr = bh.r * (0.6 + Math.random() * 0.9) + 8;
+      const x = bh.p.x + Math.cos(a) * rr, z = bh.p.z + Math.sin(a) * rr;
+      const sp = 10 + bh.r * 0.3;
+      smoke.spawn(x, terrain.height(x, z) + 1.5, z, (-Math.cos(a) * 0.6 - Math.sin(a)) * sp, 4 + Math.random() * 6, (-Math.sin(a) * 0.6 + Math.cos(a)) * sp, 5, 6, 2.2, 0.42, 0.39, 0.36, 0.7, 0.985, 3);
     }
     if (t < BH_TIME) {
       bh.tick -= dt;
@@ -567,24 +617,75 @@ async function main() {
         if (downMsg) toast(downMsg, true);
       }
     } else {
-      // collapse: everything snaps inward, then a violet shockwave
-      const c = Math.max(0, 1 - (t - BH_TIME) / 0.35);
-      bhGroup.scale.setScalar(Math.max(0.001, c));
+      // collapse: the horizon shrinks to nothing, then a violet shockwave and flash
+      const c = Math.max(0, 1 - (t - BH_TIME) / 0.45);
+      bhGroup.scale.setScalar(Math.max(0.001, c * c));
+      bh.lens = c;
       if (c === 0 && bhGroup.visible) {
         bhGroup.visible = false;
         debris.attract = null;
-        flash.position.copy(bh.p); flash.intensity = 9000;
-        for (let i = 0; i < 120; i++) {
-          tmp.set(Math.random() - 0.5, (Math.random() - 0.5) * 0.4, Math.random() - 0.5).normalize();
-          fire.spawn(bh.p.x, bh.p.y, bh.p.z, tmp.x * 80, tmp.y * 80, tmp.z * 80, 3, 6, 0.9, 0.75, 0.5, 1, 1, 0.93, 0);
+        sfx.drone(false);
+        flash.position.copy(bh.p); flash.intensity = 14000;
+        bhShock.position.copy(bh.p); bhShock.visible = true; bh.shockT = 0;
+        for (let i = 0; i < 160; i++) {
+          tmp.set(Math.random() - 0.5, (Math.random() - 0.5) * 0.3, Math.random() - 0.5).normalize();
+          fire.spawn(bh.p.x, bh.p.y, bh.p.z, tmp.x * 95, tmp.y * 95, tmp.z * 95, 3, 8, 1.0, 0.8, 0.55, 1, 1, 0.93, 0);
         }
-        sfx.boom(1.3);
-        S.shake = 3;
+        sfx.boom(1.4);
+        S.shake = 3.2;
         toast(`⚫ 블랙홀이 ${bh.n.toLocaleString()}조각을 삼켰어요`, true);
         bh.on = false;
-        bhGroup.scale.setScalar(1);
       }
     }
+  }
+
+  // ------------------------------------------------------------ screen-space gravitational lensing (only while a black hole exists)
+  const lensRT = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: MOBILE ? 0 : 4 });
+  const lensMat = new THREE.ShaderMaterial({
+    uniforms: { tScene: { value: lensRT.texture }, uCenter: { value: new THREE.Vector2() }, uRs: { value: 0 }, uAspect: { value: 1 }, uK: { value: 0 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+    fragmentShader: `uniform sampler2D tScene; uniform vec2 uCenter; uniform float uRs, uAspect, uK; varying vec2 vUv;
+      void main(){
+        vec2 d = vUv - uCenter; d.x *= uAspect;
+        float r = max(length(d), 1e-5);
+        vec2 dir = d / r;
+        // light passing close to the hole is bent toward it (thin-lens Schwarzschild approximation)
+        float defl = uK * 2.6 * uRs * uRs / r;
+        vec2 off = dir * min(defl, r * 0.98); off.x /= uAspect;
+        vec3 col = texture2D(tScene, vUv - off).rgb;
+        // photon ring and the shadow of the event horizon
+        float ring = exp(-pow((r - uRs * 1.55) / (uRs * 0.07 + 1e-4), 2.0)) * uK;
+        col += vec3(1.0, 0.82, 0.55) * ring * 0.9;
+        col *= mix(1.0, smoothstep(uRs * 0.98, uRs * 1.12, r), uK);
+        gl_FragColor = vec4(col, 1.0);
+        #include <colorspace_fragment>
+      }`,
+    depthTest: false, depthWrite: false,
+  });
+  const lensScene = new THREE.Scene();
+  const lensCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const lensQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), lensMat);
+  lensQuad.frustumCulled = false; lensScene.add(lensQuad);
+  const projV = new THREE.Vector3();
+  function renderFrame() {
+    if (bh.lens > 0.01 && bhGroup.visible !== undefined) {
+      projV.copy(bh.p).project(camera);
+      const dist = camera.position.distanceTo(bh.p);
+      if (projV.z < 1 && dist > bh.core * 1.5) {
+        const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+        if (lensRT.width !== size.x || lensRT.height !== size.y) lensRT.setSize(size.x, size.y);
+        lensMat.uniforms.uCenter.value.set(projV.x * 0.5 + 0.5, projV.y * 0.5 + 0.5);
+        lensMat.uniforms.uAspect.value = size.x / size.y;
+        lensMat.uniforms.uRs.value = (bh.core * Math.max(0.05, bhGroup.scale.x)) / dist / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+        lensMat.uniforms.uK.value = bh.lens;
+        renderer.setRenderTarget(lensRT);
+        renderer.render(scene, camera);
+        renderer.setRenderTarget(null);
+        renderer.render(lensScene, lensCam);
+        return;
+      }
+    }
+    renderer.render(scene, camera);
   }
 
   // ------------------------------------------------------------ air support: a beam from the sky erases everything inside it
@@ -1024,13 +1125,13 @@ async function main() {
   window.__game.look = (px, py, pz, tx, ty, tz) => {
     S.mode = 'debug'; camPos.set(px, py, pz); camLook.set(tx, ty, tz); rocket.visible = false;
     document.getElementById('title').classList.add('hide');
-    updateCamera(0); renderer.render(scene, camera); return 'ok';
+    updateCamera(0); renderFrame(); return 'ok';
   };
   window.__game.unlock = (w = 'ballistic') => { S.score = Math.max(S.score, UNLOCKS[w]); checkUnlocks(); return 'ok'; };
   window.__game.bombs = bombs;
   window.__game.pick = (w) => pickWeapon(w);
   window.__game.find = (name) => { const s = city.structures.find(q => q.name === name); const b = s.parts[0]; return [(b.minx + b.maxx) / 2, b.base, (b.minz + b.maxz) / 2, b.ytop - b.base]; };
-  window.__game.step = (n = 1, dt = 1 / 60, render = true) => { for (let i = 0; i < n; i++) update(dt); if (render) { drawMini(1); renderer.render(scene, camera); } return S.mode; };
+  window.__game.step = (n = 1, dt = 1 / 60, render = true) => { for (let i = 0; i < n; i++) update(dt); if (render) { drawMini(1); renderFrame(); } return S.mode; };
   // adaptive quality: slow phones drop shadows first, then resolution
   let perfAcc = 0, perfN = 0, quality = 2;
   function watchPerf(rawDt) {
@@ -1060,7 +1161,7 @@ async function main() {
     if (raw < 0.5) watchPerf(raw);
     update(dt);
     drawMini(dt);
-    renderer.render(scene, camera);
+    renderFrame();
   });
 
   // ------------------------------------------------------------ UI
