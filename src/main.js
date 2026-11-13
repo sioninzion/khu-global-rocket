@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=31';
-import { buildStructures } from './models.js?v=31';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=31';
-import { Particles, Debris } from './fx.js?v=31';
-import { Input } from './input.js?v=31';
-import { Sfx } from './audio.js?v=31';
+import { City } from './buildings.js?v=32';
+import { buildStructures } from './models.js?v=32';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=32';
+import { Particles, Debris } from './fx.js?v=32';
+import { Input } from './input.js?v=32';
+import { Sfx } from './audio.js?v=32';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=31')).json();
+  const data = await (await fetch('data/campus.json?v=32')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -660,7 +660,7 @@ async function main() {
     if (!tg) { S.hQueue = 0; return; }
     computeFwd();
     const right = new THREE.Vector3(-fwd.z, 0, fwd.x).normalize();
-    const side = (k % 2 ? 1 : -1) * (1 + Math.floor(k / 2) * 0.5);
+    const side = 0; // no sideways spread: warheads leave straight from the rocket
     const mesh = new THREE.Mesh(hunterGeo, hunterMat);
     const p = S.pos.clone().add(new THREE.Vector3(0, -1, 0)).addScaledVector(right, side * 0.8);
     mesh.position.copy(p);
@@ -698,8 +698,12 @@ async function main() {
       }
       h.mesh.position.copy(h.p);
       h.mesh.lookAt(tmp.copy(h.p).add(h.v));
-      fire.spawn(h.p.x, h.p.y, h.p.z, -h.v.x * 0.1, -h.v.y * 0.1, -h.v.z * 0.1, h.phase === 'dive' ? 1.6 : 1.0, 1, 0.25, 1, 0.65, 0.25, 1, 0.94, 0);
-      smoke.spawn(h.p.x, h.p.y, h.p.z, 0, 0.5, 0, 0.9, 4, 1.6, 0.86, 0.85, 0.83, 0.5, 0.97, 0.4);
+      for (let j = 0; j < 3; j++) { // trail: 3 puffs per frame, spread along this frame's path
+        const f = j / 3;
+        const tx = h.p.x - h.v.x * dt * f, ty = h.p.y - h.v.y * dt * f, tz = h.p.z - h.v.z * dt * f;
+        fire.spawn(tx, ty, tz, -h.v.x * 0.1, -h.v.y * 0.1, -h.v.z * 0.1, h.phase === 'dive' ? 1.6 : 1.0, 1, 0.25, 1, 0.65, 0.25, 1, 0.94, 0);
+        smoke.spawn(tx, ty, tz, 0, 0.5, 0, 0.9, 4, 1.6, 0.86, 0.85, 0.83, 0.5, 0.97, 0.4);
+      }
       if (done || h.t > 20) {
         scene.remove(h.mesh);
         hunters.splice(i, 1);
