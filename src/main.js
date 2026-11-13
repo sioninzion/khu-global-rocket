@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=38';
-import { buildStructures } from './models.js?v=38';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=38';
-import { Particles, Debris } from './fx.js?v=38';
-import { Input } from './input.js?v=38';
-import { Sfx } from './audio.js?v=38';
+import { City } from './buildings.js?v=39';
+import { buildStructures } from './models.js?v=39';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=39';
+import { Particles, Debris } from './fx.js?v=39';
+import { Input } from './input.js?v=39';
+import { Sfx } from './audio.js?v=39';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=38')).json();
+  const data = await (await fetch('data/campus.json?v=39')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -613,7 +613,7 @@ async function main() {
   // ------------------------------------------------------------ guided bomber: each skill press launches a warhead
   // that climbs slowly, picks a random building 200-800 m ahead (within 90 degrees of the heading) and dives on it.
   // With nothing in that cone it climbs 70 m above the carrier and dives on the nearest building still standing.
-  const H_MAX = 4, H_RELOAD = 0.27, H_R = 18, H_MIN = 200, H_MAXD = 800, H_HALF = THREE.MathUtils.degToRad(45), H_VMAX = 1000, H_PER_SHOT = 6, H_GAP = 0.04; // 90-degree cone, 6 warheads 0.04 s apart
+  const H_MAX = 4, H_RELOAD = 0.9, H_R = 18, H_MIN = 200, H_MAXD = 800, H_HALF = THREE.MathUtils.degToRad(45), H_VMAX = 1000, H_PER_SHOT = 12, H_GAP = 0.04; // 90-degree cone, 12 warheads 0.04 s apart
   const hunters = [];
   const hunterGeo = new THREE.ConeGeometry(0.28, 1.6, 8); hunterGeo.rotateX(-Math.PI / 2);
   const hunterMat = new THREE.MeshLambertMaterial({ color: 0xff8a1e });
