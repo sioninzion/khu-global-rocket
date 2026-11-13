@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=34';
-import { buildStructures } from './models.js?v=34';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=34';
-import { Particles, Debris } from './fx.js?v=34';
-import { Input } from './input.js?v=34';
-import { Sfx } from './audio.js?v=34';
+import { City } from './buildings.js?v=35';
+import { buildStructures } from './models.js?v=35';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=35';
+import { Particles, Debris } from './fx.js?v=35';
+import { Input } from './input.js?v=35';
+import { Sfx } from './audio.js?v=35';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=34')).json();
+  const data = await (await fetch('data/campus.json?v=35')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -667,7 +667,7 @@ async function main() {
     scene.add(mesh);
     // a slight random scatter so the salvo visibly fans out a little as it leaves
     const sa = Math.random() * Math.PI * 2, sm = 8 + Math.random() * 4;
-    hunters.push({ mesh, p, v: new THREE.Vector3(fwd.x * 8 + Math.cos(sa) * sm, 14 + Math.random() * 4, fwd.z * 8 + Math.sin(sa) * sm), phase: 'climb',
+    hunters.push({ mesh, p, v: new THREE.Vector3(fwd.x * 8 + Math.cos(sa) * sm, 6 + Math.random() * 2, fwd.z * 8 + Math.sin(sa) * sm), phase: 'climb', dt: 0,
       topY: (tg.fallback ? S.pos.y : p.y) + tg.climb, st: tg.st, aim: aimPoint(tg.st), t: 0, speed: 20 });
     sfx.boom(0.12);
   }
@@ -678,15 +678,18 @@ async function main() {
       if (h.phase === 'climb') {
         // slow lift-off straight up to the release height
         h.v.x *= Math.exp(-dt * 1.5); h.v.z *= Math.exp(-dt * 1.5);
-        h.v.y = Math.max(h.v.y, 24); // ~2 s to rise 50 m
+        // accelerating lift-off: starts slow and speeds up on the way up
+        h.v.y = Math.min(40, h.v.y + 30 * dt);
         if (h.p.y >= h.topY || h.t > 8) {
-          h.phase = 'dive';
+          h.phase = 'dive'; h.dt = 0; h.speed = Math.max(15, h.v.length() * 0.5);
           if (h.st.parts.every(b => b.aliveCount <= 0)) { const tg = pickTarget(); if (tg) { h.st = tg.st; } }
           h.aim = aimPoint(h.st);
         }
       } else {
         // dive: home on the aim point, accelerating
-        h.speed = Math.min(H_VMAX, h.speed + 260 * dt);
+        // accelerating dive: the push grows the longer it flies (slow start, then a sharp rush)
+        h.dt += dt;
+        h.speed = Math.min(H_VMAX, h.speed + (25 + 220 * h.dt) * dt);
         const want = tmp.copy(h.aim).sub(h.p).normalize().multiplyScalar(h.speed);
         h.v.lerp(want, Math.min(1, dt * 4));
       }
