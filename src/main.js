@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=5';
-import { buildStructures } from './models.js?v=5';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=5';
-import { Particles, Debris } from './fx.js?v=5';
-import { Input } from './input.js?v=5';
-import { Sfx } from './audio.js?v=5';
+import { City } from './buildings.js?v=6';
+import { buildStructures } from './models.js?v=6';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=6';
+import { Particles, Debris } from './fx.js?v=6';
+import { Input } from './input.js?v=6';
+import { Sfx } from './audio.js?v=6';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -31,7 +31,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=5')).json();
+  const data = await (await fetch('data/campus.json?v=6')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -156,6 +156,21 @@ async function main() {
     const flames = addFlames(g, 2.1, 1.5);
     crafts.ballistic = { group: g, flames, booster, bFlames, tail: 4.8, skill: '돌진', name: '탄도미사일' };
   }
+  // bomber rocket: same spec as the basic rocket, dark grey with orange bands and bomb racks
+  {
+    const g = new THREE.Group();
+    const dark = new THREE.MeshLambertMaterial({ color: 0x4a4e52 }), orange = new THREE.MeshLambertMaterial({ color: 0xe0782a });
+    const black = new THREE.MeshLambertMaterial({ color: 0x2b2d2a });
+    g.add(cyl(0.36, 0.38, 3, dark, 0), cyl(0.385, 0.385, 0.4, orange, -0.9), cyl(0.385, 0.385, 0.25, orange, 0.6));
+    const noseGeo = new THREE.ConeGeometry(0.36, 1.2, 16); noseGeo.rotateX(-Math.PI / 2);
+    const nose = new THREE.Mesh(noseGeo, orange); nose.position.z = -2.1; g.add(nose);
+    fins(g, dark, 0.62, 1.15, 0.75, 0.8, 0.06);
+    for (const sx of [-1, 1]) {
+      const pod = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 1.2, 3, 8), black);
+      pod.rotation.x = Math.PI / 2; pod.position.set(sx * 0.48, -0.25, -0.1); g.add(pod);
+    }
+    crafts.bomber = { group: g, flames: addFlames(g, 1.5, 1), tail: 2.6, skill: '폭탄', name: '폭격 로켓' };
+  }
   for (const c of Object.values(crafts)) { c.group.rotation.order = 'YXZ'; c.group.visible = false; scene.add(c.group); }
   let craft = crafts.rocket;
   craft.group.visible = true; // shown on the pad behind the title screen
@@ -193,27 +208,39 @@ async function main() {
   const camLook = new THREE.Vector3(), camPos = new THREE.Vector3(), tmp = new THREE.Vector3();
   const downSet = new Set();
   let baseFov = 62;
-  // weapons: ballistic missile unlocks after destroying UNLOCK_AT chunks (remembered on this device)
-  const UNLOCK_AT = 300;
-  try { S.unlocked = localStorage.getItem('khu-ballistic') === '1'; } catch { S.unlocked = false; }
+  // weapons unlock by total chunks destroyed (remembered on this device)
+  const UNLOCKS = { ballistic: 300, bomber: 1200 };
+  const WBTN = { rocket: 'wRocket', ballistic: 'wBallistic', bomber: 'wBomber' };
+  S.unlocked = { rocket: true, ballistic: false, bomber: false };
+  for (const w of Object.keys(UNLOCKS)) { try { S.unlocked[w] = localStorage.getItem('khu-' + w) === '1'; } catch { /* ignore */ } }
   S.weapon = S.nextWeapon = 'rocket';
-  function setUnlocked() {
-    S.unlocked = true;
-    try { localStorage.setItem('khu-ballistic', '1'); } catch { /* ignore */ }
-    $('wBallistic').classList.remove('locked');
-    $('wLock').textContent = '';
+  function setUnlocked(w) {
+    S.unlocked[w] = true;
+    try { localStorage.setItem('khu-' + w, '1'); } catch { /* ignore */ }
+    $(WBTN[w]).classList.remove('locked');
+    const lock = $(WBTN[w]).querySelector('small');
+    if (lock) lock.textContent = '';
   }
   function pickWeapon(w) {
-    if (w === 'ballistic' && !S.unlocked) { toast(`🔒 ${UNLOCK_AT}조각을 부수면 열려요 (지금 ${S.score}조각)`); return; }
+    if (!S.unlocked[w]) { toast(`🔒 ${UNLOCKS[w]}조각을 부수면 열려요 (지금 ${S.score}조각)`); return; }
     S.nextWeapon = w;
-    $('wRocket').classList.toggle('on', w === 'rocket');
-    $('wBallistic').classList.toggle('on', w === 'ballistic');
+    for (const k in WBTN) $(WBTN[k]).classList.toggle('on', k === w);
     if (S.mode === 'pad' || S.mode === 'title') { const t = S.t; resetRocket(); S.t = t; }
     else toast(`다음 발사부터 ${crafts[w].name}`);
   }
-  if (S.unlocked) setUnlocked();
-  $('wRocket').addEventListener('click', () => pickWeapon('rocket'));
-  $('wBallistic').addEventListener('click', () => pickWeapon('ballistic'));
+  for (const w of Object.keys(UNLOCKS)) if (S.unlocked[w]) setUnlocked(w);
+  for (const w in WBTN) $(WBTN[w]).addEventListener('click', () => pickWeapon(w));
+  function checkUnlocks() {
+    let delay = 1600;
+    for (const [w, need] of Object.entries(UNLOCKS)) {
+      if (!S.unlocked[w] && S.score >= need) {
+        setUnlocked(w);
+        const msg = w === 'ballistic' ? '🎯 탄도미사일 해금! 위에서 고를 수 있어요' : '💣 폭격 로켓 해금! 위에서 고를 수 있어요';
+        setTimeout(() => toast(msg, true), delay);
+        delay += 2600;
+      }
+    }
+  }
   window.__game = { S, city, terrain, input, camera };
 
   function resetRocket() {
@@ -226,7 +253,8 @@ async function main() {
     document.body.classList.toggle('ballistic', S.weapon === 'ballistic');
     $('skillName').textContent = craft.skill;
     if (craft.booster && craft.booster.parent !== craft.group) restoreBooster();
-    S.dashed = false; S.dashT = 0; S.prevSkill = false;
+    S.dashed = false; S.dashT = 0; S.prevSkill = false; S.charges = MAX_CHARGES;
+    document.body.classList.toggle('bomber', S.weapon === 'bomber');
     rocket.visible = true;
     setFlames(false);
     S.countdown = S.firstLaunch ? 3 : 1.5;
@@ -271,12 +299,9 @@ async function main() {
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   }
 
-  function explode(hitB) {
-    const p = S.pos.clone();
-    const power = clamp((S.speed - 50) / 65, 0, 1);
-    // ballistic dash: blast keeps growing with speed (capped only to stay playable)
-    const R = S.weapon === 'ballistic' && S.dashed ? Math.min(48, 10 + (S.speed - 60) * 0.06) : 8 + 6 * power;
-    const big = clamp(R / 12, 1, 4);
+  // blow up chunks around p; shared by the rocket itself and by dropped bombs
+  function blast(p, R, power, hitB, quiet) {
+    const big = clamp(R / 12, 0.45, 4);
     const res = city.explode(p.x, p.y, p.z, R, Math.random);
     let killedN = 0, fallenN = 0;
     let main = hitB ? res.find(r => r.b.owner === hitB.owner) : null;
@@ -305,9 +330,9 @@ async function main() {
     for (let i = 0; i < 55 * big; i++) {
       tmp.set(Math.random() - 0.5, Math.random() - 0.3, Math.random() - 0.5).normalize();
       const sp = (8 + Math.random() * 26) * Math.sqrt(big);
-      fire.spawn(p.x, p.y, p.z, tmp.x * sp, tmp.y * sp, tmp.z * sp, 5 + Math.random() * 6, 8 + R, 0.5 + Math.random() * 0.7, 1, 0.75, 0.35, 1, 0.9, 2);
+      fire.spawn(p.x, p.y, p.z, tmp.x * sp, tmp.y * sp, tmp.z * sp, (5 + Math.random() * 6) * Math.sqrt(big), 8 * big + R, 0.5 + Math.random() * 0.7, 1, 0.75, 0.35, 1, 0.9, 2);
     }
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 40 * Math.min(1, big); i++) {
       tmp.set(Math.random() - 0.5, Math.random(), Math.random() - 0.5).normalize();
       const sp = 30 + Math.random() * 40;
       fire.spawn(p.x, p.y, p.z, tmp.x * sp, tmp.y * sp, tmp.z * sp, 0.6, 0, 0.6 + Math.random() * 0.6, 1, 0.9, 0.5, 1, 0.94, -8);
@@ -316,38 +341,108 @@ async function main() {
       tmp.set(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5).normalize();
       const sp = (4 + Math.random() * 10) * Math.sqrt(big);
       const g = 0.18 + Math.random() * 0.15;
-      smoke.spawn(p.x, p.y, p.z, tmp.x * sp, tmp.y * sp, tmp.z * sp, 6, 22 + R * 2, 3 + Math.random() * 3, g, g, g, 0.85, 0.96, 3);
+      smoke.spawn(p.x, p.y, p.z, tmp.x * sp, tmp.y * sp, tmp.z * sp, 6 * Math.sqrt(big), 22 * big + R * 2, 3 + Math.random() * 3, g, g, g, 0.85, 0.96, 3);
     }
-    flash.position.copy(p); flash.intensity = 4000;
-    sfx.boom(Math.min(1.6, 0.7 + power * 0.4 + (big - 1) * 0.3));
+    if (!quiet || flash.intensity < 1500) { flash.position.copy(p); flash.intensity = quiet ? 1500 : 4000; }
+    sfx.boom(Math.min(1.6, quiet ? 0.35 : 0.7 + power * 0.4 + (big - 1) * 0.3));
     if (fallenN > 15) setTimeout(() => sfx.rumble(), 250);
-    S.shake = 1.4 + power + (big - 1) * 1.2;
+    S.shake = Math.max(S.shake, quiet ? 0.5 : 1.4 + power + (big - 1) * 1.2);
     const n = killedN + fallenN;
     S.score += n;
-    const justUnlocked = !S.unlocked && S.score >= UNLOCK_AT;
+    let downMsg = null;
+    for (const s of new Set(res.map(r => r.b.owner))) {
+      const alive = s.parts.reduce((t, q) => t + q.aliveCount, 0);
+      if (!downSet.has(s) && alive / s.total < 0.15) { downSet.add(s); S.down++; downMsg = `${s.name || KIND[s.kind] || '건물'} 붕괴! 💥`; }
+    }
+    checkUnlocks();
+    updateHud();
+    return { n, main, downMsg };
+  }
+
+  function explode(hitB) {
+    const p = S.pos.clone();
+    const power = clamp((S.speed - 50) / 65, 0, 1);
+    // ballistic dash: blast keeps growing with speed (capped only to stay playable)
+    const R = S.weapon === 'ballistic' && S.dashed ? Math.min(48, 10 + (S.speed - 60) * 0.06) : 8 + 6 * power;
+    const { n, main, downMsg } = blast(p, R, power, hitB, false);
     let msg;
     if (main) {
       const b = main.b;
-      const name = b.name || KIND[b.kind] || '건물';
-      msg = `${name} 명중! ${n}조각 파괴`;
-      for (const s of new Set(res.map(r => r.b.owner))) {
-        const alive = s.parts.reduce((t, q) => t + q.aliveCount, 0);
-        if (!downSet.has(s) && alive / s.total < 0.15) { downSet.add(s); S.down++; msg = `${s.name || KIND[s.kind] || '건물'} 붕괴! 💥 ${n}조각`; }
-      }
+      msg = downMsg ? `${downMsg} ${n}조각` : `${b.name || KIND[b.kind] || '건물'} 명중! ${n}조각 파괴`;
     } else {
       msg = hitB === null && S.outOfBounds ? '범위를 벗어났어요' : n ? `${n}조각 파괴` : '지면 충돌!';
     }
     toast(msg, !!main);
-    if (justUnlocked) {
-      setUnlocked();
-      setTimeout(() => toast('🎯 탄도미사일 해금! 위에서 고를 수 있어요', true), 1600);
-    }
     S.mode = 'boom'; S.t = 0; S.boomPos.copy(p);
     S.orbit = Math.atan2(camera.position.x - p.x, camera.position.z - p.z);
     rocket.visible = false;
     sfx.engine(false);
     S.shots++;
     updateHud();
+  }
+
+  // ------------------------------------------------------------ bomber: flare-style bomb salvos
+  const bombGeo = new THREE.CapsuleGeometry(0.28, 0.7, 3, 8); bombGeo.rotateX(Math.PI / 2);
+  const bombMat = new THREE.MeshLambertMaterial({ color: 0x3b3f36 });
+  const bombs = [];
+  const BOMBS_PER_SALVO = 6, MAX_CHARGES = 3, CHARGE_TIME = 2.2, BOMB_R = 7;
+  function dropSalvo() {
+    computeFwd();
+    const right = new THREE.Vector3(-fwd.z, 0, fwd.x).normalize();
+    for (let i = 0; i < BOMBS_PER_SALVO; i++) {
+      const side = i % 2 ? 1 : -1, k = Math.floor(i / 2);
+      bombs.push({
+        delay: i * 0.07, live: false, t: 0,
+        side, spread: 5 + k * 4 + Math.random() * 2,
+        mesh: null, pos: new THREE.Vector3(), vel: new THREE.Vector3(), right,
+      });
+    }
+    S.charges -= 1;
+    sfx.boom(0.15);
+  }
+  function releaseBomb(b) {
+    b.live = true;
+    b.pos.copy(S.pos).addScaledVector(fwd, -1.2).add(new THREE.Vector3(0, -0.6, 0));
+    b.vel.copy(fwd).multiplyScalar(S.speed * 0.55).addScaledVector(b.right, b.side * b.spread).add(new THREE.Vector3(0, -2 - Math.random() * 3, 0));
+    b.mesh = new THREE.Mesh(bombGeo, bombMat);
+    b.mesh.position.copy(b.pos);
+    scene.add(b.mesh);
+  }
+  function updateBombs(dt) {
+    for (let i = bombs.length - 1; i >= 0; i--) {
+      const b = bombs[i];
+      if (!b.live) {
+        b.delay -= dt;
+        if (b.delay <= 0 && S.mode === 'flight') releaseBomb(b);
+        else if (S.mode !== 'flight') bombs.splice(i, 1);
+        continue;
+      }
+      b.t += dt;
+      b.vel.y -= 16 * dt;
+      b.vel.multiplyScalar(Math.exp(-dt * 0.8)); // flares lose speed fast and drop behind
+      // bright flare trail
+      fire.spawn(b.pos.x, b.pos.y, b.pos.z, (Math.random() - 0.5) * 2, 1, (Math.random() - 0.5) * 2, 1.4, 1.2, 0.35, 1, 0.85, 0.5, 1, 0.94, 0);
+      if (Math.random() < 0.5) smoke.spawn(b.pos.x, b.pos.y, b.pos.z, 0, 0.6, 0, 0.8, 4, 1.4, 0.82, 0.8, 0.78, 0.45, 0.97, 0.4);
+      const d = b.vel.length() * dt, steps = Math.max(1, Math.ceil(d / 0.8));
+      let hit = null, done = false;
+      for (let k = 0; k < steps && !done; k++) {
+        b.pos.addScaledVector(b.vel, dt / steps);
+        const h = city.hit(b.pos.x, b.pos.y, b.pos.z);
+        if (h) { hit = h; done = true; }
+        else if (b.pos.y < terrain.height(b.pos.x, b.pos.z) + 0.2) done = true;
+        else if (!terrain.inside(b.pos.x, b.pos.z, 5) || b.t > 10) { scene.remove(b.mesh); bombs.splice(i, 1); b.mesh = null; break; }
+      }
+      if (!b.mesh) continue;
+      b.mesh.position.copy(b.pos);
+      b.mesh.lookAt(tmp.copy(b.pos).add(b.vel));
+      if (done) {
+        scene.remove(b.mesh);
+        bombs.splice(i, 1);
+        const { n, main, downMsg } = blast(b.pos.clone(), BOMB_R, 0.3, hit ? hit.b : null, true);
+        if (downMsg) toast(downMsg, true);
+        else if (main && n) { S.bombHits = (S.bombHits || 0) + n; toast(`💣 ${main.b.name || KIND[main.b.kind] || '건물'} +${n}조각`); }
+      }
+    }
   }
 
   function updateHud() {
@@ -398,6 +493,10 @@ async function main() {
           targetSpeed = 46;
           S.boosting = false;
           if (skillPress && S.t > 0.3) fireDash();
+        } else if (S.weapon === 'bomber') {
+          S.boosting = false;
+          S.charges = Math.min(MAX_CHARGES, S.charges + dt / CHARGE_TIME);
+          if (skillPress && S.charges >= 1) dropSalvo();
         } else {
           S.boosting = inp.boost && S.fuel > (S.boosting ? 0 : 0.12);
           S.fuel = clamp(S.fuel + (S.boosting ? -0.32 : 0.11) * dt, 0, 1);
@@ -459,6 +558,7 @@ async function main() {
         scene.remove(o); dropped.obj = null;
       }
     }
+    updateBombs(dt);
     fire.update(dt); smoke.update(dt); debris.update(dt);
     flash.intensity *= Math.exp(-dt * 7);
     if (flash.intensity < 1) flash.intensity = 0;
@@ -469,9 +569,10 @@ async function main() {
     const agl = S.pos.y - terrain.height(S.pos.x, S.pos.z);
     $('speed').textContent = Math.round(S.speed * 3.6);
     $('alt').textContent = Math.max(0, Math.round(agl));
-    const gauge = S.weapon === 'ballistic' ? (S.dashed ? 0 : 1) : S.fuel;
+    const gauge = S.weapon === 'ballistic' ? (S.dashed ? 0 : 1) : S.weapon === 'bomber' ? S.charges / MAX_CHARGES : S.fuel;
     $('boostFill').style.transform = `scaleX(${gauge.toFixed(3)})`;
-    $('boostBtn').classList.toggle('empty', S.weapon === 'ballistic' ? S.dashed : S.fuel < 0.12 && !S.boosting);
+    $('boostBtn').classList.toggle('empty', S.weapon === 'ballistic' ? S.dashed : S.weapon === 'bomber' ? S.charges < 1 : S.fuel < 0.12 && !S.boosting);
+    if (S.weapon === 'bomber') $('skillName').textContent = `폭탄 ×${Math.floor(S.charges)}`;
   }
 
   function updateCamera(dt) {
@@ -572,7 +673,8 @@ async function main() {
     document.getElementById('title').classList.add('hide');
     updateCamera(0); renderer.render(scene, camera); return 'ok';
   };
-  window.__game.unlock = () => { S.score = Math.max(S.score, UNLOCK_AT); setUnlocked(); return 'ok'; };
+  window.__game.unlock = (w = 'ballistic') => { S.score = Math.max(S.score, UNLOCKS[w]); checkUnlocks(); return 'ok'; };
+  window.__game.bombs = bombs;
   window.__game.pick = (w) => pickWeapon(w);
   window.__game.find = (name) => { const s = city.structures.find(q => q.name === name); const b = s.parts[0]; return [(b.minx + b.maxx) / 2, b.base, (b.minz + b.maxz) / 2, b.ytop - b.base]; };
   window.__game.step = (n = 1, dt = 1 / 60, render = true) => { for (let i = 0; i < n; i++) update(dt); if (render) { drawMini(1); renderer.render(scene, camera); } return S.mode; };

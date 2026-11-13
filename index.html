@@ -49,11 +49,14 @@
   #boostFill { width: 100%; height: 100%; background: linear-gradient(90deg, #ffb347, #ff5e3a); transform-origin: left; }
   #boostBtn small { font-size: 11px; font-weight: 700; letter-spacing: 0; opacity: .9; margin-top: 2px; }
   body.ballistic #boostBtn { background: radial-gradient(circle at 50% 35%, #9fb36b, #4f5a2c 70%); box-shadow: 0 6px 18px rgba(80,90,40,.5); }
+  body.bomber #boostBtn { background: radial-gradient(circle at 50% 35%, #8a9096, #3e4347 70%); box-shadow: 0 6px 18px rgba(40,40,40,.5); }
+  body.bomber #boostBtn.on { background: radial-gradient(circle at 50% 35%, #ffb36b, #e0782a 70%); }
   body.ballistic #boostBtn.on { background: radial-gradient(circle at 50% 35%, #ffe08a, #ff8a2f 70%); }
   #weapons { position: fixed; z-index: 4; top: calc(10px + var(--safe-t)); left: 50%; transform: translateX(-50%); display: none; gap: 6px; }
   body.playing #weapons { display: flex; }
   #weapons button { font: inherit; font-size: 13px; font-weight: 700; color: #fff; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.35);
-    border-radius: 999px; padding: 7px 12px; white-space: nowrap; }
+    border-radius: 999px; padding: 7px 11px; white-space: nowrap; }
+  @media (max-width: 420px) { #weapons button { font-size: 11.5px; padding: 6px 8px; } #weapons { gap: 4px; } }
   #weapons button.on { background: rgba(255,120,70,.8); border-color: #fff; }
   #weapons button.locked { opacity: .55; }
   #weapons small { font-size: 11px; opacity: .9; }
@@ -105,7 +108,8 @@
 <div id="joyBase"><div id="joyKnob"></div></div>
 <div id="weapons">
   <button id="wRocket" class="on">🚀 기본 로켓</button>
-  <button id="wBallistic" class="locked">🎯 탄도미사일 <small id="wLock">🔒 300조각</small></button>
+  <button id="wBallistic" class="locked">🎯 탄도미사일 <small>🔒300</small></button>
+  <button id="wBomber" class="locked">💣 폭격 로켓 <small>🔒1200</small></button>
 </div>
 <div id="boostWrap"><div id="boostBtn">스킬<small id="skillName">부스트</small></div><div id="boostBar"><div id="boostFill"></div></div></div>
 <div id="btns">
@@ -129,6 +133,6 @@
   </div>
 </div>
 
-<script type="module" src="src/main.js?v=5"></script>
+<script type="module" src="src/main.js?v=6"></script>
 </body>
 </html>
