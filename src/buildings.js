@@ -7,7 +7,7 @@
 // Ornaments (cornices, parapets, plinths, pilasters, capitals) belong to the
 // chunk they sit on and disappear with it.
 import * as THREE from 'three';
-import { makeFacadeMaterial, WIN } from './facade.js?v=15';
+import { makeFacadeMaterial, WIN } from './facade.js?v=16';
 
 const EPS = 1e-3;
 
@@ -343,7 +343,8 @@ export class Building {
   }
 
   // column = true: a vertical cylinder of radius R wipes out every floor (sky laser)
-  blast(x, y, z, R, rand, column = false) {
+  // ring = [r0, r1]: earthquake band, knocks out the ground floors of everything in the band
+  blast(x, y, z, R, rand, column = false, ring = null) {
     const killed = [];
     const nL = this.nL;
     for (let pi = 0; pi < this.pieces.length; pi++) {
@@ -351,11 +352,12 @@ export class Building {
       const dx = p.cx - x, dz = p.cz - z;
       const d2 = dx * dx + dz * dz;
       if (d2 > (R + this.cs) * (R + this.cs)) continue;
-      const l0 = column ? 0 : Math.max(0, Math.floor((y - R - this.ybot) / this.lh));
-      const l1 = column ? nL - 1 : Math.min(nL - 1, Math.floor((y + R - this.ybot) / this.lh));
+      const l0 = column || ring ? 0 : Math.max(0, Math.floor((y - R - this.ybot) / this.lh));
+      const l1 = ring ? Math.min(nL - 1, Math.floor((this.base + 7 - this.ybot) / this.lh)) : column ? nL - 1 : Math.min(nL - 1, Math.floor((y + R - this.ybot) / this.lh));
       for (let l = l0; l <= l1; l++) {
         const c = pi * nL + l;
         if (!this.alive[c]) continue;
+        if (ring) { if (d2 >= ring[0] * ring[0] && d2 < ring[1] * ring[1]) { this.alive[c] = 0; killed.push(c); } continue; }
         if (column) { if (d2 < R * R) { this.alive[c] = 0; killed.push(c); } continue; }
         const dy = this.ybot + (l + 0.5) * this.lh - y;
         const d = Math.sqrt(d2 + dy * dy);
@@ -670,7 +672,7 @@ export class City {
     return out;
   }
 
-  explode(x, y, z, R, rand, column = false) {
+  explode(x, y, z, R, rand, column = false, ring = null) {
     const out = [];
     const touched = new Set();
     const seen = new Set();
@@ -679,8 +681,9 @@ export class City {
         for (const b of this.grid.get(gx * 100000 + gz) || []) {
           if (seen.has(b)) continue;
           seen.add(b);
-          if (x + R < b.minx || x - R > b.maxx || z + R < b.minz || z - R > b.maxz || (!column && (y - R > b.ytop + b.roof.max || y + R < b.ybot))) continue;
-          const res = b.blast(x, y, z, R, rand, column);
+          if (x + R < b.minx || x - R > b.maxx || z + R < b.minz || z - R > b.maxz || (!column && !ring && (y - R > b.ytop + b.roof.max || y + R < b.ybot))) continue;
+          if (ring && b.floating) continue;
+          const res = b.blast(x, y, z, R, rand, column, ring);
           if (res.killed.length || res.fallen.length) {
             out.push({ b, ...res });
             touched.add(b.owner);

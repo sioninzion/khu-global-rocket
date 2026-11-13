@@ -22,7 +22,7 @@
     --cut: 10px;
   }
   body.ballistic { --skill: #5d6b35; } body.bomber { --skill: #4a5056; } body.cluster { --skill: #2f5d9c; }
-  body.nuke { --skill: #d9a800; --skill-ink: #1e1f1c; } body.airstrike { --skill: #138aa6; } body.blackhole { --skill: #5b2fb0; }
+  body.nuke { --skill: #d9a800; --skill-ink: #1e1f1c; } body.airstrike { --skill: #138aa6; } body.blackhole { --skill: #5b2fb0; } body.quake { --skill: #9a5a22; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1420; color: var(--ink);
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
@@ -174,7 +174,7 @@
     #btnSettings { left: auto; right: calc(170px + var(--safe-r)); }
     #stats { min-width: 0; }
   }
-  @media (max-width: 400px) { #weapons button { width: 44px; height: 50px; } #weapons button i { font-size: 18px; } #weapons { gap: 3px; padding: 4px; } }
+  @media (max-width: 440px) { #weapons button { width: 40px; height: 48px; } #weapons button i { font-size: 17px; } #weapons .ws { font-size: 9px; } #weapons small { font-size: 7.5px; } #weapons { gap: 3px; padding: 4px; } }
 </style>
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
@@ -212,6 +212,7 @@
   <button id="wNuke" class="locked"><i>☢️</i><span class="ws">핵</span><small>🔒7000</small></button>
   <button id="wAir" class="locked"><i>🛰️</i><span class="ws">지원</span><small>🔒12000</small></button>
   <button id="wBlack" class="locked"><i>⚫</i><span class="ws">블랙홀</span><small>🔒20000</small></button>
+  <button id="wQuake" class="locked"><i>🌋</i><span class="ws">지진</span><small>🔒30000</small></button>
 </div>
 <div id="boostWrap"><div id="boostBtn">
   <div class="core"><div class="cd"></div><span id="skillIcon">🔥</span><span id="skillName">부스트</span></div>
@@ -246,6 +247,6 @@
   </div>
 </div>
 
-<script type="module" src="src/main.js?v=15"></script>
+<script type="module" src="src/main.js?v=16"></script>
 </body>
 </html>
