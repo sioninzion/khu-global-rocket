@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=30';
-import { buildStructures } from './models.js?v=30';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=30';
-import { Particles, Debris } from './fx.js?v=30';
-import { Input } from './input.js?v=30';
-import { Sfx } from './audio.js?v=30';
+import { City } from './buildings.js?v=31';
+import { buildStructures } from './models.js?v=31';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=31';
+import { Particles, Debris } from './fx.js?v=31';
+import { Input } from './input.js?v=31';
+import { Sfx } from './audio.js?v=31';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=30')).json();
+  const data = await (await fetch('data/campus.json?v=31')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -615,10 +615,8 @@ async function main() {
   // With nothing in that cone it climbs 70 m above the carrier and dives on the nearest building still standing.
   const H_MAX = 4, H_RELOAD = 0.6, H_R = 18, H_MIN = 200, H_MAXD = 800, H_HALF = THREE.MathUtils.degToRad(65), H_VMAX = 400, H_PER_SHOT = 6, H_GAP = 0.1; // 130-degree cone, 6 warheads 0.1 s apart
   const hunters = [];
-  const hunterGeo = new THREE.ConeGeometry(0.55, 3.2, 10); hunterGeo.rotateX(-Math.PI / 2);
-  const hunterMat = new THREE.MeshBasicMaterial({ color: 0xffa040 }); // self-lit so it reads against buildings and sky
-  const hunterGlowGeo = new THREE.SphereGeometry(1.6, 12, 8);
-  const hunterGlowMat = new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false });
+  const hunterGeo = new THREE.ConeGeometry(0.28, 1.6, 8); hunterGeo.rotateX(-Math.PI / 2);
+  const hunterMat = new THREE.MeshLambertMaterial({ color: 0xff8a1e });
   function structCenter(st) {
     let x = 0, z = 0, n = 0;
     for (const b of st.parts) { if (b.aliveCount <= 0) continue; x += (b.minx + b.maxx) / 2; z += (b.minz + b.maxz) / 2; n++; }
@@ -664,13 +662,11 @@ async function main() {
     const right = new THREE.Vector3(-fwd.z, 0, fwd.x).normalize();
     const side = (k % 2 ? 1 : -1) * (1 + Math.floor(k / 2) * 0.5);
     const mesh = new THREE.Mesh(hunterGeo, hunterMat);
-    mesh.add(new THREE.Mesh(hunterGlowGeo, hunterGlowMat));
     const p = S.pos.clone().add(new THREE.Vector3(0, -1, 0)).addScaledVector(right, side * 0.8);
     mesh.position.copy(p);
     scene.add(mesh);
     hunters.push({ mesh, p, v: new THREE.Vector3(fwd.x * 8, 14, fwd.z * 8).addScaledVector(right, side * 6), phase: 'climb',
-      topY: (tg.fallback ? S.pos.y : p.y) + tg.climb, st: tg.st, aim: aimPoint(tg.st), t: 0, speed: 20,
-      fx: Math.sin(S.yaw) + right.x * side * 0.25, fz: -Math.cos(S.yaw) + right.z * side * 0.25 });
+      topY: (tg.fallback ? S.pos.y : p.y) + tg.climb, st: tg.st, aim: aimPoint(tg.st), t: 0, speed: 20 });
     sfx.boom(0.12);
   }
   function updateHunters(dt) {
@@ -679,8 +675,7 @@ async function main() {
       h.t += dt;
       if (h.phase === 'climb') {
         // slow lift-off straight up to the release height
-        // climb forward and up so the warheads rise in front of the chase camera, not out of view above it
-        h.v.x += (h.fx * 60 - h.v.x) * Math.min(1, dt * 3); h.v.z += (h.fz * 60 - h.v.z) * Math.min(1, dt * 3);
+        h.v.x *= Math.exp(-dt * 1.5); h.v.z *= Math.exp(-dt * 1.5);
         h.v.y = Math.max(h.v.y, 24); // ~2 s to rise 50 m
         if (h.p.y >= h.topY || h.t > 8) {
           h.phase = 'dive';
@@ -703,8 +698,8 @@ async function main() {
       }
       h.mesh.position.copy(h.p);
       h.mesh.lookAt(tmp.copy(h.p).add(h.v));
-      fire.spawn(h.p.x, h.p.y, h.p.z, -h.v.x * 0.1, -h.v.y * 0.1, -h.v.z * 0.1, h.phase === 'dive' ? 3.2 : 2.4, 1.5, 0.35, 1, 0.7, 0.3, 1, 0.94, 0);
-      smoke.spawn(h.p.x, h.p.y, h.p.z, 0, 0.5, 0, 1.6, 6, 2.4, 0.95, 0.94, 0.92, 0.7, 0.97, 0.4);
+      fire.spawn(h.p.x, h.p.y, h.p.z, -h.v.x * 0.1, -h.v.y * 0.1, -h.v.z * 0.1, h.phase === 'dive' ? 1.6 : 1.0, 1, 0.25, 1, 0.65, 0.25, 1, 0.94, 0);
+      smoke.spawn(h.p.x, h.p.y, h.p.z, 0, 0.5, 0, 0.9, 4, 1.6, 0.86, 0.85, 0.83, 0.5, 0.97, 0.4);
       if (done || h.t > 20) {
         scene.remove(h.mesh);
         hunters.splice(i, 1);
@@ -1333,9 +1328,7 @@ async function main() {
       const desired = new THREE.Vector3(S.pos.x - tmp.x * back, S.pos.y - tmp.y * back + 3.2, S.pos.z - tmp.z * back);
       const follow = S.dashed ? 16 : 7;
       camPos.lerp(desired, 1 - Math.exp(-dt * follow));
-      // while guided warheads are climbing, tilt the view up a little so the salvo stays on screen
-      const lift = S.weapon === 'hunter' && hunters.some(h => h.phase === 'climb') ? 6 : 0;
-      camLook.lerp(tmp.copy(S.pos).addScaledVector(fwd, 22).add(new THREE.Vector3(0, lift, 0)), 1 - Math.exp(-dt * (S.dashed ? 18 : 9)));
+      camLook.lerp(tmp.copy(S.pos).addScaledVector(fwd, 22), 1 - Math.exp(-dt * (S.dashed ? 18 : 9)));
     } else if (S.mode === 'cluster') {
       // watch the submunitions spread from behind and above the burst point
       const c = subCentroid(tmp) || S.boomPos;
