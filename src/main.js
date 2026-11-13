@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { NIGHT } from './facade.js?v=57';
-import { City } from './buildings.js?v=57';
-import { buildStructures } from './models.js?v=57';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=57';
-import { Particles, Debris } from './fx.js?v=57';
-import { Input } from './input.js?v=57';
-import { Sfx } from './audio.js?v=57';
+import { NIGHT } from './facade.js?v=58';
+import { City } from './buildings.js?v=58';
+import { buildStructures } from './models.js?v=58';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=58';
+import { Particles, Debris } from './fx.js?v=58';
+import { Input } from './input.js?v=58';
+import { Sfx } from './audio.js?v=58';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -34,7 +34,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=57')).json();
+  const data = await (await fetch('data/campus.json?v=58')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -1165,7 +1165,7 @@ async function main() {
         }
         if (h) { hit = h; done = true; }
         else if (below) done = true;
-        else if (!terrain.inside(b.pos.x, b.pos.z, 5) || b.t > 10) { scene.remove(b.mesh); bombs.splice(i, 1); b.mesh = null; if (b.kind === 'sub') S.clusterDone++; break; }
+        else if (b.kind !== 'sub' && (!terrain.inside(b.pos.x, b.pos.z, 5) || b.t > 10)) { scene.remove(b.mesh); bombs.splice(i, 1); b.mesh = null; if (b.kind === 'sub') S.clusterDone++; break; }
       }
       if (!b.mesh) continue;
       if (b.kind === 'bomb' && b.contact !== null && b.t - b.contact >= b.fuse) done = true; // fuse ran out
@@ -1319,7 +1319,7 @@ async function main() {
       }
       sfx.engine(S.mode === 'flight', S.boosting);
     } else if (S.mode === 'cluster') {
-      if (!bombs.some(b => b.kind === 'sub') || S.t > 12) endCluster();
+      if (!bombs.some(b => b.kind === 'sub')) endCluster(); // submunitions live until they hit something
     } else if (S.mode === 'boom') {
       if (S.t > (S.boomTime || 3.4) && !laser.on && !bh.on && !quake.on) resetRocket();
     }
