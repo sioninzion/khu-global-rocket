@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { NIGHT } from './facade.js?v=48';
-import { City } from './buildings.js?v=48';
-import { buildStructures } from './models.js?v=48';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=48';
-import { Particles, Debris } from './fx.js?v=48';
-import { Input } from './input.js?v=48';
-import { Sfx } from './audio.js?v=48';
+import { NIGHT } from './facade.js?v=49';
+import { City } from './buildings.js?v=49';
+import { buildStructures } from './models.js?v=49';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=49';
+import { Particles, Debris } from './fx.js?v=49';
+import { Input } from './input.js?v=49';
+import { Sfx } from './audio.js?v=49';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -34,7 +34,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=48')).json();
+  const data = await (await fetch('data/campus.json?v=49')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -498,7 +498,8 @@ async function main() {
     const p = S.pos.clone();
     const power = clamp((S.speed - 50) / 65, 0, 1);
     // ballistic dash: blast keeps growing with speed (capped only to stay playable)
-    let R = S.weapon === 'ballistic' && S.dashed ? Math.min(48, 10 + (S.speed - 60) * 0.06) : 8 + 6 * power;
+    // ballistic missile: blast radius (m) = impact speed in km/h (as on the HUD) / 23
+    let R = S.weapon === 'ballistic' ? (S.speed * 3.6) / 23 : 8 + 6 * power;
     S.boomTime = 3.4; S.boomScale = 1;
     if (S.weapon === 'nuke') { R = NUKE_R; S.boomTime = 7; S.boomScale = 4; startNukeFx(p); }
     const { n, main, downMsg } = blast(p, R, S.weapon === 'nuke' ? 1 : power, hitB, false);
