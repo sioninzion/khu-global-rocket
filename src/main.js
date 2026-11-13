@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=21';
-import { buildStructures } from './models.js?v=21';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=21';
-import { Particles, Debris } from './fx.js?v=21';
-import { Input } from './input.js?v=21';
-import { Sfx } from './audio.js?v=21';
+import { City } from './buildings.js?v=22';
+import { buildStructures } from './models.js?v=22';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=22';
+import { Particles, Debris } from './fx.js?v=22';
+import { Input } from './input.js?v=22';
+import { Sfx } from './audio.js?v=22';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=21')).json();
+  const data = await (await fetch('data/campus.json?v=22')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -557,7 +557,7 @@ async function main() {
   }
 
   // ------------------------------------------------------------ laser missile: a beam 4x the missile's radius fired along the heading
-  const BEAM_R = LASER_MISSILE_R * 4, BEAM_LEN = 420;
+  const BEAM_R = LASER_MISSILE_R * 4, BEAM_LEN = 840, BEAM_CUT_R = BEAM_R * 2.2; // drawn at BEAM_R, destroys within BEAM_CUT_R
   const beamGeo2 = new THREE.CylinderGeometry(1, 1, 1, 20, 1, true); beamGeo2.rotateX(Math.PI / 2); beamGeo2.translate(0, 0, -0.5);
   const lzCore = new THREE.Mesh(beamGeo2, addMat(0xffffff)), lzGlow = new THREE.Mesh(beamGeo2, addMat(0xff2a4a));
   lzCore.material.side = lzGlow.material.side = THREE.DoubleSide;
@@ -587,7 +587,7 @@ async function main() {
     lzTick -= dt;
     if (lzTick <= 0) {
       lzTick = 0.04; // hits 25 times a second
-      const { n, main, downMsg } = blast(o.clone(), BEAM_R, 0.8, null, true, false, false, null, { ox: o.x, oy: o.y, oz: o.z, dx: fwd.x, dy: fwd.y, dz: fwd.z, len });
+      const { n, main, downMsg } = blast(o.clone(), BEAM_CUT_R, 0.8, null, true, false, false, null, { ox: o.x, oy: o.y, oz: o.z, dx: fwd.x, dy: fwd.y, dz: fwd.z, len });
       if (downMsg) toast(downMsg, true);
       else if (main && n > 6) toast(`🔴 ${main.b.name || KIND[main.b.kind] || '건물'} 절단!`);
     }
