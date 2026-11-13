@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { NIGHT } from './facade.js?v=43';
-import { City } from './buildings.js?v=43';
-import { buildStructures } from './models.js?v=43';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=43';
-import { Particles, Debris } from './fx.js?v=43';
-import { Input } from './input.js?v=43';
-import { Sfx } from './audio.js?v=43';
+import { NIGHT } from './facade.js?v=44';
+import { City } from './buildings.js?v=44';
+import { buildStructures } from './models.js?v=44';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=44';
+import { Particles, Debris } from './fx.js?v=44';
+import { Input } from './input.js?v=44';
+import { Sfx } from './audio.js?v=44';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -34,7 +34,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=43')).json();
+  const data = await (await fetch('data/campus.json?v=44')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
