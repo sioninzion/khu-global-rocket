@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=16';
-import { buildStructures } from './models.js?v=16';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=16';
-import { Particles, Debris } from './fx.js?v=16';
-import { Input } from './input.js?v=16';
-import { Sfx } from './audio.js?v=16';
+import { City } from './buildings.js?v=17';
+import { buildStructures } from './models.js?v=17';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=17';
+import { Particles, Debris } from './fx.js?v=17';
+import { Input } from './input.js?v=17';
+import { Sfx } from './audio.js?v=17';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=16')).json();
+  const data = await (await fetch('data/campus.json?v=17')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -967,7 +967,9 @@ async function main() {
     for (const [w, need] of Object.entries(UNLOCKS)) if (!S.unlocked[w]) $(WBTN[w]).style.setProperty('--p', Math.min(1, S.score / need).toFixed(3));
     $('score').textContent = S.score.toLocaleString();
     $('down').textContent = S.down;
-    $('shots').textContent = S.shots;
+    // share of all pre-fractured chunks in the city that are gone
+    const alive = city.buildings.reduce((t, b) => t + b.aliveCount, 0);
+    $('ratio').textContent = ((1 - alive / city.totalChunks) * 100).toFixed(2) + '%';
   }
 
   function computeFwd() {
