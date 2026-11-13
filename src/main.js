@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { NIGHT } from './facade.js?v=53';
-import { City } from './buildings.js?v=53';
-import { buildStructures } from './models.js?v=53';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=53';
-import { Particles, Debris } from './fx.js?v=53';
-import { Input } from './input.js?v=53';
-import { Sfx } from './audio.js?v=53';
+import { NIGHT } from './facade.js?v=54';
+import { City } from './buildings.js?v=54';
+import { buildStructures } from './models.js?v=54';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=54';
+import { Particles, Debris } from './fx.js?v=54';
+import { Input } from './input.js?v=54';
+import { Sfx } from './audio.js?v=54';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -34,7 +34,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=53')).json();
+  const data = await (await fetch('data/campus.json?v=54')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -738,7 +738,7 @@ async function main() {
         scene.remove(h.mesh);
         hunters.splice(i, 1);
         if (!done) continue;
-        const { n, main, downMsg } = blast(h.p.clone(), (h.v.length() * 3.6) / 40, 0.7, /* radius (m) = impact speed in km/h / 40 */ hit ? hit.b : null, true);
+        const { n, main, downMsg } = blast(h.p.clone(), (h.v.length() * 3.6) / 110, 0.7, /* radius (m) = impact speed in km/h / 110 */ hit ? hit.b : null, true);
         if (downMsg) toast(downMsg, true);
       }
     }
