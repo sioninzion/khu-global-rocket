@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=10';
-import { buildStructures } from './models.js?v=10';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=10';
-import { Particles, Debris } from './fx.js?v=10';
-import { Input } from './input.js?v=10';
-import { Sfx } from './audio.js?v=10';
+import { City } from './buildings.js?v=11';
+import { buildStructures } from './models.js?v=11';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=11';
+import { Particles, Debris } from './fx.js?v=11';
+import { Input } from './input.js?v=11';
+import { Sfx } from './audio.js?v=11';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -31,7 +31,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=10')).json();
+  const data = await (await fetch('data/campus.json?v=11')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -749,7 +749,7 @@ async function main() {
   // reload 1.5x faster (2.2s -> ~1.47s); bomb power x4: destroyed volume grows with R^3, so radius 7 -> 11
   const BOMBS_PER_SALVO = 6, MAX_CHARGES = 3, CHARGE_TIME = 2.2 / 1.5, BOMB_R = 11;
   // cluster missile submunitions
-  const CLUSTER_N = 18, SUB_R = 10, SUB_R_GROW = 7, SUB_R_MAX = 30;
+  const CLUSTER_N = 18, SUB_R = 10, SUB_R_GROW = 7 * 2 / 3, SUB_R_MAX = 30; // radius grows ~4.7 m per second of flight
   const subGeo = new THREE.ConeGeometry(0.16, 0.9, 6); subGeo.rotateX(-Math.PI / 2);
   const subMat = new THREE.MeshLambertMaterial({ color: 0xd9dde0 });
   function dropSalvo() {
