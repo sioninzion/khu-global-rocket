@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { NIGHT } from './facade.js?v=56';
-import { City } from './buildings.js?v=56';
-import { buildStructures } from './models.js?v=56';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=56';
-import { Particles, Debris } from './fx.js?v=56';
-import { Input } from './input.js?v=56';
-import { Sfx } from './audio.js?v=56';
+import { NIGHT } from './facade.js?v=57';
+import { City } from './buildings.js?v=57';
+import { buildStructures } from './models.js?v=57';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=57';
+import { Particles, Debris } from './fx.js?v=57';
+import { Input } from './input.js?v=57';
+import { Sfx } from './audio.js?v=57';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -34,7 +34,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=56')).json();
+  const data = await (await fetch('data/campus.json?v=57')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -1037,7 +1037,7 @@ async function main() {
   const bombMat = new THREE.MeshLambertMaterial({ color: 0x3b3f36 });
   const bombs = [];
   // reload 1.5x faster (2.2s -> ~1.47s); bomb power x4: destroyed volume grows with R^3, so radius 7 -> 11
-  const BOMBS_PER_SALVO = 18, MAX_CHARGES = 3, CHARGE_TIME = 2.2 / 1.5, BOMB_R = 11;
+  const BOMBS_PER_SALVO = 18, MAX_CHARGES = 3, CHARGE_TIME = 2.2 / 1.5, BOMB_R = 11 * 1.3; // radius +30%
   // cluster missile submunitions
   const CLUSTER_N = 18, SUB_R = 10, SUB_R_GROW = 7 * 2 / 3, SUB_R_MAX = 30; // radius grows ~4.7 m per second of flight
   const subGeo = new THREE.ConeGeometry(0.16, 0.9, 6); subGeo.rotateX(-Math.PI / 2);
@@ -1049,6 +1049,7 @@ async function main() {
       const side = i % 2 ? 1 : -1, k = Math.floor(i / 2);
       bombs.push({
         delay: i * 0.035, live: false, t: 0,
+        fuse: [0, 1, 2][i % 3], contact: null, // 6 explode on contact, 6 after 1 s, 6 after 2 s (they bounce and roll meanwhile)
         side, spread: 4 + k * 1.7 + Math.random() * 2,
         mesh: null, pos: new THREE.Vector3(), vel: new THREE.Vector3(), right,
       });
@@ -1133,23 +1134,43 @@ async function main() {
         smoke.spawn(b.pos.x, b.pos.y, b.pos.z, (Math.random() - 0.5), 0.5, (Math.random() - 0.5), 0.7, 3.5, 1.6, 0.9, 0.9, 0.88, 0.5, 0.97, 0.3);
       } else {
         b.vel.y -= 16 * dt;
-        b.vel.multiplyScalar(Math.exp(-dt * 0.8)); // flares lose speed fast and drop behind
-        // bright flare trail
-        fire.spawn(b.pos.x, b.pos.y, b.pos.z, (Math.random() - 0.5) * 2, 1, (Math.random() - 0.5) * 2, 1.4, 1.2, 0.35, 1, 0.85, 0.5, 1, 0.94, 0);
-        if (Math.random() < 0.5) smoke.spawn(b.pos.x, b.pos.y, b.pos.z, 0, 0.6, 0, 0.8, 4, 1.4, 0.82, 0.8, 0.78, 0.45, 0.97, 0.4);
+        b.vel.multiplyScalar(Math.exp(-dt * (b.contact === null ? 0.8 : 0.5))); // flares lose speed fast and drop behind
+        if (b.contact !== null && b.pos.y < terrain.height(b.pos.x, b.pos.z) + 1.2) {
+          // rolling on the ground: slide down the slope
+          const e = 1.5, hx = terrain.height(b.pos.x + e, b.pos.z) - terrain.height(b.pos.x - e, b.pos.z), hz = terrain.height(b.pos.x, b.pos.z + e) - terrain.height(b.pos.x, b.pos.z - e);
+          b.vel.x -= hx / (2 * e) * 22 * dt; b.vel.z -= hz / (2 * e) * 22 * dt;
+        }
+        if (b.contact === null) {
+          // bright flare trail while falling
+          fire.spawn(b.pos.x, b.pos.y, b.pos.z, (Math.random() - 0.5) * 2, 1, (Math.random() - 0.5) * 2, 1.4, 1.2, 0.35, 1, 0.85, 0.5, 1, 0.94, 0);
+          if (Math.random() < 0.5) smoke.spawn(b.pos.x, b.pos.y, b.pos.z, 0, 0.6, 0, 0.8, 4, 1.4, 0.82, 0.8, 0.78, 0.45, 0.97, 0.4);
+        } else if ((b.t * 8 | 0) % 2 === 0) {
+          // armed and ticking: blinking red light
+          fire.spawn(b.pos.x, b.pos.y + 0.4, b.pos.z, 0, 0, 0, 1.3, 0, 0.1, 1, 0.15, 0.1, 1, 0.9, 0);
+        }
       }
       const d = b.vel.length() * dt, steps = Math.max(1, Math.ceil(d / 0.8));
       let hit = null, done = false;
       for (let k = 0; k < steps && !done; k++) {
         b.pos.addScaledVector(b.vel, dt / steps);
         const h = city.hit(b.pos.x, b.pos.y, b.pos.z);
+        const below = !h && b.pos.y < terrain.height(b.pos.x, b.pos.z) + 0.2;
+        if ((h || below) && b.kind === 'bomb' && b.fuse > 0) {
+          // delayed fuse: bounce off and keep rolling until the timer runs out
+          if (b.contact === null) b.contact = b.t;
+          b.pos.addScaledVector(b.vel, -dt / steps);
+          if (h) { b.vel.x *= -0.35; b.vel.z *= -0.35; b.vel.y = Math.abs(b.vel.y) * 0.25; }
+          else { b.pos.y = terrain.height(b.pos.x, b.pos.z) + 0.25; b.vel.y = Math.abs(b.vel.y) * 0.3; b.vel.x *= 0.8; b.vel.z *= 0.8; }
+          break;
+        }
         if (h) { hit = h; done = true; }
-        else if (b.pos.y < terrain.height(b.pos.x, b.pos.z) + 0.2) done = true;
+        else if (below) done = true;
         else if (!terrain.inside(b.pos.x, b.pos.z, 5) || b.t > 10) { scene.remove(b.mesh); bombs.splice(i, 1); b.mesh = null; if (b.kind === 'sub') S.clusterDone++; break; }
       }
       if (!b.mesh) continue;
+      if (b.kind === 'bomb' && b.contact !== null && b.t - b.contact >= b.fuse) done = true; // fuse ran out
       b.mesh.position.copy(b.pos);
-      b.mesh.lookAt(tmp.copy(b.pos).add(b.vel));
+      if (b.vel.lengthSq() > 0.01) b.mesh.lookAt(tmp.copy(b.pos).add(b.vel));
       if (done) {
         scene.remove(b.mesh);
         bombs.splice(i, 1);
