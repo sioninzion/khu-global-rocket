@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=20';
-import { buildStructures } from './models.js?v=20';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=20';
-import { Particles, Debris } from './fx.js?v=20';
-import { Input } from './input.js?v=20';
-import { Sfx } from './audio.js?v=20';
+import { City } from './buildings.js?v=21';
+import { buildStructures } from './models.js?v=21';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=21';
+import { Particles, Debris } from './fx.js?v=21';
+import { Input } from './input.js?v=21';
+import { Sfx } from './audio.js?v=21';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=20')).json();
+  const data = await (await fetch('data/campus.json?v=21')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -586,7 +586,7 @@ async function main() {
     for (let i = 0; i < 3; i++) fire.spawn(end.x, end.y, end.z, (Math.random() - 0.5) * 20, Math.random() * 15, (Math.random() - 0.5) * 20, 2, 3, 0.3, 1, 0.35, 0.4, 1, 0.94, 0);
     lzTick -= dt;
     if (lzTick <= 0) {
-      lzTick = 0.08;
+      lzTick = 0.04; // hits 25 times a second
       const { n, main, downMsg } = blast(o.clone(), BEAM_R, 0.8, null, true, false, false, null, { ox: o.x, oy: o.y, oz: o.z, dx: fwd.x, dy: fwd.y, dz: fwd.z, len });
       if (downMsg) toast(downMsg, true);
       else if (main && n > 6) toast(`🔴 ${main.b.name || KIND[main.b.kind] || '건물'} 절단!`);
@@ -1079,7 +1079,7 @@ async function main() {
         } else if (S.weapon === 'laser') {
           S.boosting = false;
           S.firing = inp.boost && S.fuel > (S.firing ? 0 : 0.1);
-          S.fuel = clamp(S.fuel + (S.firing ? -0.34 : 0.12) * dt, 0, 1);
+          S.fuel = clamp(S.fuel + (S.firing ? -0.17 : 0.12 * 1.8) * dt, 0, 1); // half the drain, 1.8x recharge
         } else if (S.weapon === 'quake') {
           S.boosting = false;
           if (skillPress && S.t > 0.3) { S.drill = true; S.drillY0 = S.pos.y; toast('⛏️ 드릴 강하!'); sfx.boom(0.3); }
