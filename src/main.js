@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=14';
-import { buildStructures } from './models.js?v=14';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=14';
-import { Particles, Debris } from './fx.js?v=14';
-import { Input } from './input.js?v=14';
-import { Sfx } from './audio.js?v=14';
+import { City } from './buildings.js?v=15';
+import { buildStructures } from './models.js?v=15';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=15';
+import { Particles, Debris } from './fx.js?v=15';
+import { Input } from './input.js?v=15';
+import { Sfx } from './audio.js?v=15';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=14')).json();
+  const data = await (await fetch('data/campus.json?v=15')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -591,7 +591,7 @@ async function main() {
     const want = Math.min(BH_RMAX, (BH_R0 + BH_EAT * Math.sqrt(bh.n)) * g3);
     bh.r += (want - bh.r) * Math.min(1, dt * 2.5);
     S.boomScale = Math.max(2.3, bh.r / 24);
-    if (bh.r > 40 + bh.step * 20) { bh.step++; toast(`⚫ 블랙홀이 커지고 있어요! 반경 ${Math.round(bh.r)}m`, true); }
+    if (bh.r > 40 + bh.step * 20) { bh.step++; toast(`⚫ 블랙홀 반경 ${Math.round(bh.r)}M`, true); }
     bh.core = 1.2 + bh.r * 0.14;
     bh.lens = g3;
     bhCore.scale.setScalar(bh.core);
