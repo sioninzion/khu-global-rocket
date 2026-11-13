@@ -74,46 +74,35 @@ export class Sfx {
     this.dr.o2.frequency.setTargetAtTime(57 - 22 * x, t, 0.2);
     this.dr.f.frequency.setTargetAtTime(180 + 260 * x, t, 0.2);
   }
-  // laser beam, repulsor-style: a quick rising charge-up whine with a punchy thump,
-  // then a bright airy energy stream (high tones with vibrato over a hissing whoosh), and a falling tail on release
+  // laser beam: a heavy low "woooong" - thick low tones through a slowly swelling low-pass, with a sub rumble
   beam(on) {
     if (!this.ctx) return;
     const ctx = this.ctx, t = ctx.currentTime;
     if (on && !this.bm) {
-      const out = ctx.createGain(); out.gain.value = 0.0001; out.connect(this.master);
-      // charge-up whine
-      const ch = ctx.createOscillator(); ch.type = 'sine';
-      ch.frequency.setValueAtTime(320, t); ch.frequency.exponentialRampToValueAtTime(1900, t + 0.22);
-      const chg = ctx.createGain(); chg.gain.setValueAtTime(0.0001, t); chg.gain.exponentialRampToValueAtTime(0.35, t + 0.05); chg.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
-      ch.connect(chg).connect(this.master); ch.start(t); ch.stop(t + 0.32);
-      // punch
-      const th = ctx.createOscillator(); th.type = 'sine';
-      th.frequency.setValueAtTime(140, t + 0.12); th.frequency.exponentialRampToValueAtTime(45, t + 0.4);
-      const thg = ctx.createGain(); thg.gain.setValueAtTime(0.0001, t); thg.gain.setValueAtTime(0.0001, t + 0.12); thg.gain.exponentialRampToValueAtTime(0.5, t + 0.14); thg.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
-      th.connect(thg).connect(this.master); th.start(t); th.stop(t + 0.5);
-      // sustained energy stream
-      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), o3 = ctx.createOscillator();
-      o1.type = 'sine'; o1.frequency.value = 880; o2.type = 'triangle'; o2.frequency.value = 1322; o3.type = 'sine'; o3.frequency.value = 1763;
-      const vib = ctx.createOscillator(); vib.frequency.value = 7.5; const vibG = ctx.createGain(); vibG.gain.value = 18;
-      vib.connect(vibG); vibG.connect(o1.frequency); vibG.connect(o2.frequency); vibG.connect(o3.frequency);
-      const tone = ctx.createGain(); tone.gain.value = 0.16;
-      o1.connect(tone); o2.connect(tone); o3.connect(tone);
-      const hiss = ctx.createBufferSource(); hiss.buffer = this.noise; hiss.loop = true;
-      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 1.2;
-      const sw = ctx.createOscillator(); sw.frequency.value = 3.2; const swG = ctx.createGain(); swG.gain.value = 900;
-      sw.connect(swG).connect(bp.frequency);
-      const hg = ctx.createGain(); hg.gain.value = 0.5;
-      hiss.connect(bp).connect(hg);
-      tone.connect(out); hg.connect(out);
-      for (const n of [o1, o2, o3, vib, hiss, sw]) n.start(t + 0.12);
-      out.gain.setValueAtTime(0.0001, t + 0.12); out.gain.exponentialRampToValueAtTime(0.42, t + 0.2);
-      this.bm = { nodes: [o1, o2, o3, vib, hiss, sw], out, o1, o2, o3 };
+      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), sub = ctx.createOscillator();
+      o1.type = 'sawtooth'; o1.frequency.value = 55;
+      o2.type = 'sawtooth'; o2.frequency.value = 82.6;
+      sub.type = 'sine'; sub.frequency.value = 41;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420; lp.Q.value = 6;
+      const swell = ctx.createOscillator(); swell.frequency.value = 0.9; // slow "woo-oong" swell
+      const swellG = ctx.createGain(); swellG.gain.value = 220;
+      swell.connect(swellG).connect(lp.frequency);
+      const trem = ctx.createOscillator(); trem.frequency.value = 7; // slight throb
+      const tremG = ctx.createGain(); tremG.gain.value = 0.18;
+      const amp = ctx.createGain(); amp.gain.value = 0.8;
+      trem.connect(tremG).connect(amp.gain);
+      const subG = ctx.createGain(); subG.gain.value = 0.55;
+      o1.connect(lp); o2.connect(lp); lp.connect(amp); sub.connect(subG).connect(amp);
+      const out = ctx.createGain(); out.gain.value = 0.0001;
+      amp.connect(out).connect(this.master);
+      for (const n of [o1, o2, sub, swell, trem]) n.start(t);
+      out.gain.exponentialRampToValueAtTime(0.5, t + 0.15);
+      this.bm = { nodes: [o1, o2, sub, swell, trem], out, tones: [o1, o2, sub] };
     } else if (!on && this.bm) {
       const b = this.bm; this.bm = null;
-      // falling tail
-      for (const o of [b.o1, b.o2, b.o3]) o.frequency.setTargetAtTime(o.frequency.value * 0.45, t, 0.08);
-      b.out.gain.cancelScheduledValues(t); b.out.gain.setValueAtTime(b.out.gain.value || 0.42, t); b.out.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
-      for (const n of b.nodes) n.stop(t + 0.32);
+      for (const o of b.tones) o.frequency.setTargetAtTime(o.frequency.value * 0.6, t, 0.1); // winds down
+      b.out.gain.cancelScheduledValues(t); b.out.gain.setValueAtTime(Math.max(0.0001, b.out.gain.value), t); b.out.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      for (const n of b.nodes) n.stop(t + 0.35);
     }
   }
   toggleMute() {
