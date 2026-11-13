@@ -56,7 +56,11 @@
   body.playing #weapons { display: flex; }
   #weapons button { font: inherit; font-size: 13px; font-weight: 700; color: #fff; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.35);
     border-radius: 999px; padding: 7px 11px; white-space: nowrap; }
-  @media (max-width: 420px) { #weapons button { font-size: 11.5px; padding: 6px 8px; } #weapons { gap: 4px; } }
+  #weapons .ws { display: none; }
+  @media (max-width: 640px) { #weapons .wl { display: none; } #weapons .ws { display: inline; } }
+  @media (max-width: 420px) { #weapons button { font-size: 11.5px; padding: 6px 7px; } #weapons { gap: 4px; } }
+  body.cluster #boostBtn { background: radial-gradient(circle at 50% 35%, #8fb4e6, #2f5d9c 70%); box-shadow: 0 6px 18px rgba(47,93,156,.5); }
+  body.cluster #boostBtn.on { background: radial-gradient(circle at 50% 35%, #ffe6a0, #ff9a3c 70%); }
   #weapons button.on { background: rgba(255,120,70,.8); border-color: #fff; }
   #weapons button.locked { opacity: .55; }
   #weapons small { font-size: 11px; opacity: .9; }
@@ -107,9 +111,10 @@
 
 <div id="joyBase"><div id="joyKnob"></div></div>
 <div id="weapons">
-  <button id="wRocket" class="on">🚀 기본 로켓</button>
-  <button id="wBallistic" class="locked">🎯 탄도미사일 <small>🔒300</small></button>
-  <button id="wBomber" class="locked">💣 폭격 로켓 <small>🔒1200</small></button>
+  <button id="wRocket" class="on">🚀 <span class="wl">기본 로켓</span><span class="ws">기본</span></button>
+  <button id="wBallistic" class="locked">🎯 <span class="wl">탄도미사일</span><span class="ws">탄도</span> <small>🔒300</small></button>
+  <button id="wBomber" class="locked">💣 <span class="wl">폭격 로켓</span><span class="ws">폭격</span> <small>🔒1200</small></button>
+  <button id="wCluster" class="locked">💥 <span class="wl">집속탄</span><span class="ws">집속</span> <small>🔒3400</small></button>
 </div>
 <div id="boostWrap"><div id="boostBtn">스킬<small id="skillName">부스트</small></div><div id="boostBar"><div id="boostFill"></div></div></div>
 <div id="btns">
@@ -133,6 +138,6 @@
   </div>
 </div>
 
-<script type="module" src="src/main.js?v=6"></script>
+<script type="module" src="src/main.js?v=7"></script>
 </body>
 </html>

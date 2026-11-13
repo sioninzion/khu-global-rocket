@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=6';
-import { buildStructures } from './models.js?v=6';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=6';
-import { Particles, Debris } from './fx.js?v=6';
-import { Input } from './input.js?v=6';
-import { Sfx } from './audio.js?v=6';
+import { City } from './buildings.js?v=7';
+import { buildStructures } from './models.js?v=7';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=7';
+import { Particles, Debris } from './fx.js?v=7';
+import { Input } from './input.js?v=7';
+import { Sfx } from './audio.js?v=7';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -31,7 +31,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=6')).json();
+  const data = await (await fetch('data/campus.json?v=7')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -171,6 +171,25 @@ async function main() {
     }
     crafts.bomber = { group: g, flames: addFlames(g, 1.5, 1), tail: 2.6, skill: '폭탄', name: '폭격 로켓' };
   }
+  // cluster missile: silver body with panel lines and a segmented nose that splits open
+  {
+    const g = new THREE.Group();
+    const R = 0.36 * 1.25;
+    const silver = new THREE.MeshLambertMaterial({ color: 0xc9ced3 }), blue = new THREE.MeshLambertMaterial({ color: 0x2f5d9c });
+    const dark = new THREE.MeshLambertMaterial({ color: 0x3a3f45 });
+    g.add(cyl(R, R, 3.2, silver, 0), cyl(R + 0.01, R + 0.01, 0.25, blue, -1.0), cyl(R + 0.01, R + 0.01, 0.25, blue, 0.2), cyl(R + 0.01, R + 0.01, 0.12, dark, -0.4));
+    const noseGeo = new THREE.ConeGeometry(R, 1.4, 16); noseGeo.rotateX(-Math.PI / 2);
+    const nose = new THREE.Mesh(noseGeo, silver); nose.position.z = -2.3; g.add(nose);
+    for (let k = 0; k < 4; k++) { // seams of the nose petals
+      const seam = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 1.3), dark);
+      const a2 = k * Math.PI / 2;
+      seam.position.set(Math.cos(a2) * R * 0.55, Math.sin(a2) * R * 0.55, -2.2);
+      seam.rotation.set(-Math.sin(a2) * 0.3, Math.cos(a2) * 0.3, 0);
+      g.add(seam);
+    }
+    fins(g, blue, R + 0.25, 1.3, 0.8, 0.9, 0.06);
+    crafts.cluster = { group: g, flames: addFlames(g, 1.6, 1.15), tail: 2.8, skill: '분열', name: '집속탄' };
+  }
   for (const c of Object.values(crafts)) { c.group.rotation.order = 'YXZ'; c.group.visible = false; scene.add(c.group); }
   let craft = crafts.rocket;
   craft.group.visible = true; // shown on the pad behind the title screen
@@ -209,8 +228,8 @@ async function main() {
   const downSet = new Set();
   let baseFov = 62;
   // weapons unlock by total chunks destroyed (remembered on this device)
-  const UNLOCKS = { ballistic: 300, bomber: 1200 };
-  const WBTN = { rocket: 'wRocket', ballistic: 'wBallistic', bomber: 'wBomber' };
+  const UNLOCKS = { ballistic: 300, bomber: 1200, cluster: 3400 };
+  const WBTN = { rocket: 'wRocket', ballistic: 'wBallistic', bomber: 'wBomber', cluster: 'wCluster' };
   S.unlocked = { rocket: true, ballistic: false, bomber: false };
   for (const w of Object.keys(UNLOCKS)) { try { S.unlocked[w] = localStorage.getItem('khu-' + w) === '1'; } catch { /* ignore */ } }
   S.weapon = S.nextWeapon = 'rocket';
@@ -235,7 +254,7 @@ async function main() {
     for (const [w, need] of Object.entries(UNLOCKS)) {
       if (!S.unlocked[w] && S.score >= need) {
         setUnlocked(w);
-        const msg = w === 'ballistic' ? '🎯 탄도미사일 해금! 위에서 고를 수 있어요' : '💣 폭격 로켓 해금! 위에서 고를 수 있어요';
+        const msg = { ballistic: '🎯 탄도미사일', bomber: '💣 폭격 로켓', cluster: '💥 집속탄' }[w] + ' 해금! 위에서 고를 수 있어요';
         setTimeout(() => toast(msg, true), delay);
         delay += 2600;
       }
@@ -253,8 +272,9 @@ async function main() {
     document.body.classList.toggle('ballistic', S.weapon === 'ballistic');
     $('skillName').textContent = craft.skill;
     if (craft.booster && craft.booster.parent !== craft.group) restoreBooster();
-    S.dashed = false; S.dashT = 0; S.prevSkill = false; S.charges = MAX_CHARGES;
+    S.dashed = false; S.dashT = 0; S.prevSkill = false; S.charges = MAX_CHARGES; S.clustered = false;
     document.body.classList.toggle('bomber', S.weapon === 'bomber');
+    document.body.classList.toggle('cluster', S.weapon === 'cluster');
     rocket.visible = true;
     setFlames(false);
     S.countdown = S.firstLaunch ? 3 : 1.5;
@@ -385,7 +405,12 @@ async function main() {
   const bombGeo = new THREE.CapsuleGeometry(0.28, 0.7, 3, 8); bombGeo.rotateX(Math.PI / 2);
   const bombMat = new THREE.MeshLambertMaterial({ color: 0x3b3f36 });
   const bombs = [];
-  const BOMBS_PER_SALVO = 6, MAX_CHARGES = 3, CHARGE_TIME = 2.2, BOMB_R = 7;
+  // reload 1.5x faster (2.2s -> ~1.47s); bomb power x4: destroyed volume grows with R^3, so radius 7 -> 11
+  const BOMBS_PER_SALVO = 6, MAX_CHARGES = 3, CHARGE_TIME = 2.2 / 1.5, BOMB_R = 11;
+  // cluster missile submunitions
+  const CLUSTER_N = 18, SUB_R = 9;
+  const subGeo = new THREE.ConeGeometry(0.16, 0.9, 6); subGeo.rotateX(-Math.PI / 2);
+  const subMat = new THREE.MeshLambertMaterial({ color: 0xd9dde0 });
   function dropSalvo() {
     computeFwd();
     const right = new THREE.Vector3(-fwd.z, 0, fwd.x).normalize();
@@ -404,10 +429,60 @@ async function main() {
     b.live = true;
     b.pos.copy(S.pos).addScaledVector(fwd, -1.2).add(new THREE.Vector3(0, -0.6, 0));
     b.vel.copy(fwd).multiplyScalar(S.speed * 0.55).addScaledVector(b.right, b.side * b.spread).add(new THREE.Vector3(0, -2 - Math.random() * 3, 0));
+    b.kind = 'bomb'; b.R = BOMB_R;
     b.mesh = new THREE.Mesh(bombGeo, bombMat);
     b.mesh.position.copy(b.pos);
     scene.add(b.mesh);
   }
+  // cluster missile skill: the missile bursts and fans out submunitions over a wide area
+  function fireCluster() {
+    S.clustered = true;
+    const f = computeFwd().clone();
+    const up0 = Math.abs(f.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+    const a = new THREE.Vector3().crossVectors(f, up0).normalize(), bb = new THREE.Vector3().crossVectors(a, f).normalize();
+    const v0 = Math.max(S.speed, 45) * 0.8;
+    for (let i = 0; i < CLUSTER_N; i++) {
+      const inner = i < 6;
+      const ang = (inner ? i / 6 : (i - 6) / (CLUSTER_N - 6)) * Math.PI * 2 + (inner ? 0.5 : 0) + Math.random() * 0.25;
+      const spread = (inner ? 9 : 20) + Math.random() * 6;
+      const vel = f.clone().multiplyScalar(v0 * (0.8 + Math.random() * 0.35))
+        .addScaledVector(a, Math.cos(ang) * spread).addScaledVector(bb, Math.sin(ang) * spread).add(new THREE.Vector3(0, 4, 0));
+      const mesh = new THREE.Mesh(subGeo, subMat);
+      mesh.position.copy(S.pos);
+      scene.add(mesh);
+      bombs.push({ kind: 'sub', live: true, delay: 0, t: 0, pos: S.pos.clone(), vel, mesh, R: SUB_R });
+    }
+    const p = S.pos;
+    for (let i = 0; i < 40; i++) {
+      tmp.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+      fire.spawn(p.x, p.y, p.z, tmp.x * 18, tmp.y * 18, tmp.z * 18, 2.5, 5, 0.45, 1, 0.85, 0.5, 1, 0.9, 0);
+      smoke.spawn(p.x, p.y, p.z, tmp.x * 6, tmp.y * 6, tmp.z * 6, 3, 10, 2.5, 0.8, 0.8, 0.78, 0.7, 0.95, 0.5);
+    }
+    flash.position.copy(p); flash.intensity = 2000;
+    S.shake = 1.0;
+    sfx.boom(0.5);
+    rocket.visible = false;
+    sfx.engine(false);
+    S.mode = 'cluster'; S.t = 0;
+    S.clusterN = 0; S.clusterHits = 0; S.clusterDone = 0; S.clusterSum = new THREE.Vector3();
+    S.clusterDir = f; S.clusterFrom = p.clone();
+    toast('💥 분열!');
+  }
+  function endCluster() {
+    const c = S.clusterDone ? S.clusterSum.clone().divideScalar(S.clusterDone) : S.pos.clone();
+    toast(`💥 집속탄 ${S.clusterHits}발 명중! ${S.clusterN}조각 파괴`, S.clusterN > 0);
+    S.mode = 'boom'; S.t = 0; S.boomPos.copy(c);
+    S.orbit = Math.atan2(camera.position.x - c.x, camera.position.z - c.z);
+    S.shots++;
+    updateHud();
+  }
+  function subCentroid(out) {
+    let n = 0;
+    out.set(0, 0, 0);
+    for (const b of bombs) if (b.kind === 'sub') { out.add(b.pos); n++; }
+    return n ? out.divideScalar(n) : null;
+  }
+
   function updateBombs(dt) {
     for (let i = bombs.length - 1; i >= 0; i--) {
       const b = bombs[i];
@@ -418,11 +493,19 @@ async function main() {
         continue;
       }
       b.t += dt;
-      b.vel.y -= 16 * dt;
-      b.vel.multiplyScalar(Math.exp(-dt * 0.8)); // flares lose speed fast and drop behind
-      // bright flare trail
-      fire.spawn(b.pos.x, b.pos.y, b.pos.z, (Math.random() - 0.5) * 2, 1, (Math.random() - 0.5) * 2, 1.4, 1.2, 0.35, 1, 0.85, 0.5, 1, 0.94, 0);
-      if (Math.random() < 0.5) smoke.spawn(b.pos.x, b.pos.y, b.pos.z, 0, 0.6, 0, 0.8, 4, 1.4, 0.82, 0.8, 0.78, 0.45, 0.97, 0.4);
+      if (b.kind === 'sub') {
+        // mini rockets: burn for a moment, then arc down onto their own target area
+        if (b.t < 1.1) b.vel.addScaledVector(tmp.copy(b.vel).normalize(), 22 * dt);
+        b.vel.y -= 11 * dt;
+        fire.spawn(b.pos.x, b.pos.y, b.pos.z, -b.vel.x * 0.1, -b.vel.y * 0.1, -b.vel.z * 0.1, 1.1, 0.8, 0.22, 1, 0.7, 0.3, 1, 0.94, 0);
+        smoke.spawn(b.pos.x, b.pos.y, b.pos.z, (Math.random() - 0.5), 0.5, (Math.random() - 0.5), 0.7, 3.5, 1.6, 0.9, 0.9, 0.88, 0.5, 0.97, 0.3);
+      } else {
+        b.vel.y -= 16 * dt;
+        b.vel.multiplyScalar(Math.exp(-dt * 0.8)); // flares lose speed fast and drop behind
+        // bright flare trail
+        fire.spawn(b.pos.x, b.pos.y, b.pos.z, (Math.random() - 0.5) * 2, 1, (Math.random() - 0.5) * 2, 1.4, 1.2, 0.35, 1, 0.85, 0.5, 1, 0.94, 0);
+        if (Math.random() < 0.5) smoke.spawn(b.pos.x, b.pos.y, b.pos.z, 0, 0.6, 0, 0.8, 4, 1.4, 0.82, 0.8, 0.78, 0.45, 0.97, 0.4);
+      }
       const d = b.vel.length() * dt, steps = Math.max(1, Math.ceil(d / 0.8));
       let hit = null, done = false;
       for (let k = 0; k < steps && !done; k++) {
@@ -430,7 +513,7 @@ async function main() {
         const h = city.hit(b.pos.x, b.pos.y, b.pos.z);
         if (h) { hit = h; done = true; }
         else if (b.pos.y < terrain.height(b.pos.x, b.pos.z) + 0.2) done = true;
-        else if (!terrain.inside(b.pos.x, b.pos.z, 5) || b.t > 10) { scene.remove(b.mesh); bombs.splice(i, 1); b.mesh = null; break; }
+        else if (!terrain.inside(b.pos.x, b.pos.z, 5) || b.t > 10) { scene.remove(b.mesh); bombs.splice(i, 1); b.mesh = null; if (b.kind === 'sub') S.clusterDone++; break; }
       }
       if (!b.mesh) continue;
       b.mesh.position.copy(b.pos);
@@ -438,9 +521,13 @@ async function main() {
       if (done) {
         scene.remove(b.mesh);
         bombs.splice(i, 1);
-        const { n, main, downMsg } = blast(b.pos.clone(), BOMB_R, 0.3, hit ? hit.b : null, true);
-        if (downMsg) toast(downMsg, true);
-        else if (main && n) { S.bombHits = (S.bombHits || 0) + n; toast(`💣 ${main.b.name || KIND[main.b.kind] || '건물'} +${n}조각`); }
+        const { n, main, downMsg } = blast(b.pos.clone(), b.R, b.kind === 'sub' ? 0.5 : 0.6, hit ? hit.b : null, true);
+        if (b.kind === 'sub') {
+          S.clusterN += n; S.clusterHits += n > 0 ? 1 : 0; S.clusterDone++;
+          S.clusterSum.add(b.pos);
+          if (downMsg) toast(downMsg, true);
+        } else if (downMsg) toast(downMsg, true);
+        else if (main && n) toast(`💣 ${main.b.name || KIND[main.b.kind] || '건물'} +${n}조각`);
       }
     }
   }
@@ -493,6 +580,9 @@ async function main() {
           targetSpeed = 46;
           S.boosting = false;
           if (skillPress && S.t > 0.3) fireDash();
+        } else if (S.weapon === 'cluster') {
+          S.boosting = false;
+          if (skillPress && S.t > 0.3) fireCluster();
         } else if (S.weapon === 'bomber') {
           S.boosting = false;
           S.charges = Math.min(MAX_CHARGES, S.charges + dt / CHARGE_TIME);
@@ -507,7 +597,7 @@ async function main() {
         if (!S.dashed) computeFwd();
       }
       const dist = S.speed * dt;
-      const steps = Math.max(1, Math.ceil(dist / 0.8));
+      const steps = S.mode === 'flight' ? Math.max(1, Math.ceil(dist / 0.8)) : 0; // 0 once the cluster missile has split
       for (let i = 0; i < steps; i++) {
         S.pos.addScaledVector(fwd, dist / steps);
         const h = city.hit(S.pos.x, S.pos.y, S.pos.z);
@@ -537,6 +627,8 @@ async function main() {
         if (craft.bFlames && !S.dashed) { const s2 = 1.9 * (0.85 + Math.random() * 0.3); craft.bFlames[0].scale.set(1.9, 1.9, s2); craft.bFlames[1].scale.set(1.05, 1.05, s2 * 0.6); }
       }
       sfx.engine(S.mode === 'flight', S.boosting);
+    } else if (S.mode === 'cluster') {
+      if (!bombs.some(b => b.kind === 'sub') || S.t > 12) endCluster();
     } else if (S.mode === 'boom') {
       if (S.t > 3.4) resetRocket();
     }
@@ -569,9 +661,9 @@ async function main() {
     const agl = S.pos.y - terrain.height(S.pos.x, S.pos.z);
     $('speed').textContent = Math.round(S.speed * 3.6);
     $('alt').textContent = Math.max(0, Math.round(agl));
-    const gauge = S.weapon === 'ballistic' ? (S.dashed ? 0 : 1) : S.weapon === 'bomber' ? S.charges / MAX_CHARGES : S.fuel;
+    const gauge = S.weapon === 'ballistic' ? (S.dashed ? 0 : 1) : S.weapon === 'cluster' ? (S.clustered ? 0 : 1) : S.weapon === 'bomber' ? S.charges / MAX_CHARGES : S.fuel;
     $('boostFill').style.transform = `scaleX(${gauge.toFixed(3)})`;
-    $('boostBtn').classList.toggle('empty', S.weapon === 'ballistic' ? S.dashed : S.weapon === 'bomber' ? S.charges < 1 : S.fuel < 0.12 && !S.boosting);
+    $('boostBtn').classList.toggle('empty', S.weapon === 'cluster' ? S.clustered : S.weapon === 'ballistic' ? S.dashed : S.weapon === 'bomber' ? S.charges < 1 : S.fuel < 0.12 && !S.boosting);
     if (S.weapon === 'bomber') $('skillName').textContent = `폭탄 ×${Math.floor(S.charges)}`;
   }
 
@@ -595,6 +687,13 @@ async function main() {
       const follow = S.dashed ? 16 : 7;
       camPos.lerp(desired, 1 - Math.exp(-dt * follow));
       camLook.lerp(tmp.copy(S.pos).addScaledVector(fwd, 22), 1 - Math.exp(-dt * (S.dashed ? 18 : 9)));
+    } else if (S.mode === 'cluster') {
+      // watch the submunitions spread from behind and above the burst point
+      const c = subCentroid(tmp) || S.boomPos;
+      const hx = S.clusterDir.x, hz = S.clusterDir.z, hl = Math.hypot(hx, hz) || 1;
+      const desired = new THREE.Vector3(c.x - hx / hl * 55, c.y + 38, c.z - hz / hl * 55);
+      camPos.lerp(desired, 1 - Math.exp(-dt * 3));
+      camLook.lerp(c, 1 - Math.exp(-dt * 6));
     } else if (S.mode === 'debug') {
       // camera placed by window.__game.look() for testing
     } else if (S.mode === 'boom') {
