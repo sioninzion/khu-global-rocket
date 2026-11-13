@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=18';
-import { buildStructures } from './models.js?v=18';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=18';
-import { Particles, Debris } from './fx.js?v=18';
-import { Input } from './input.js?v=18';
-import { Sfx } from './audio.js?v=18';
+import { City } from './buildings.js?v=19';
+import { buildStructures } from './models.js?v=19';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=19';
+import { Particles, Debris } from './fx.js?v=19';
+import { Input } from './input.js?v=19';
+import { Sfx } from './audio.js?v=19';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=18')).json();
+  const data = await (await fetch('data/campus.json?v=19')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -460,7 +460,10 @@ async function main() {
     const { n, main, downMsg } = blast(p, R, S.weapon === 'nuke' ? 1 : power, hitB, false);
     if (S.weapon === 'airstrike') { startLaser(p); S.boomTime = 5.2; S.boomScale = 1.8; }
     if (S.weapon === 'blackhole') { startBlackHole(p); S.boomTime = BH_TIME + 1.4; S.boomScale = 2.3; }
-    if (S.weapon === 'quake') { startQuake(p); S.boomTime = QUAKE_TIME + 2.5; S.boomScale = 4.2; }
+    if (S.weapon === 'quake') {
+      // plain impact: 100 m; drill dive: twice the height it fell
+      const qr = S.drill ? Math.max(20, 2 * (S.drillY0 - p.y)) : 100;
+      startQuake(p, qr); S.boomTime = QUAKE_TIME + 2.5; S.boomScale = 4.2; }
     let msg;
     if (main) {
       const b = main.b;
@@ -471,7 +474,7 @@ async function main() {
     if (S.weapon === 'nuke') msg = `☢️ 핵폭발! ${n.toLocaleString()}조각 파괴`;
     if (S.weapon === 'airstrike') msg = `🛰️ 공중 지원 요청! ${msg}`;
     if (S.weapon === 'blackhole') msg = '⚫ 특이점 전개!';
-    if (S.weapon === 'quake') msg = '🌋 지진 발생!';
+    if (S.weapon === 'quake') msg = `🌋 지진 발생! 반경 ${Math.round(quake.R)}m`;
     toast(msg, !!main || S.weapon === 'nuke');
     S.mode = 'boom'; S.t = 0; S.boomPos.copy(p);
     S.orbit = Math.atan2(camera.position.x - p.x, camera.position.z - p.z);
@@ -545,8 +548,8 @@ async function main() {
   const quake = { on: false, t: 0, x: 0, z: 0, gy: 0, r: 0, n: 0, tick: 0, prev: 0 };
   const quakeRing = new THREE.Mesh(new THREE.TorusGeometry(1, 0.012, 6, 96), addMat(0xffb070));
   quakeRing.rotation.x = Math.PI / 2; quakeRing.visible = false; scene.add(quakeRing);
-  function startQuake(p) {
-    Object.assign(quake, { on: true, t: 0, x: p.x, z: p.z, gy: terrain.height(p.x, p.z), r: 0, n: 0, tick: 0, prev: 0 });
+  function startQuake(p, radius) {
+    Object.assign(quake, { R: radius, on: true, t: 0, x: p.x, z: p.z, gy: terrain.height(p.x, p.z), r: 0, n: 0, tick: 0, prev: 0 });
     quakeRing.visible = true;
     quakeRing.position.set(p.x, quake.gy + 1.5, p.z);
     for (let i = 0; i < 70; i++) { // dirt thrown up where the drill went in
@@ -561,7 +564,7 @@ async function main() {
     quake.t += dt;
     const t = quake.t;
     const f = Math.min(1, t / QUAKE_TIME);
-    quake.r = QUAKE_R * (1 - (1 - f) * (1 - f) * 0.35) * f;
+    quake.r = quake.R * (1 - (1 - f) * (1 - f) * 0.35) * f;
     quakeRing.scale.set(quake.r, quake.r, 60); // thin glowing line on the ground
     quakeRing.material.opacity = 0.7 * (1 - f);
     S.shake = Math.max(S.shake, 2.8 * (1 - f * 0.7));
@@ -1024,7 +1027,7 @@ async function main() {
           if (skillPress && S.t > 0.3) fireDash();
         } else if (S.weapon === 'quake') {
           S.boosting = false;
-          if (skillPress && S.t > 0.3) { S.drill = true; toast('⛏️ 드릴 강하!'); sfx.boom(0.3); }
+          if (skillPress && S.t > 0.3) { S.drill = true; S.drillY0 = S.pos.y; toast('⛏️ 드릴 강하!'); sfx.boom(0.3); }
         } else if (S.weapon === 'blackhole') {
           S.boosting = false;
           if (skillPress && S.t > 0.3) { explode(null); }
