@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=13';
-import { buildStructures } from './models.js?v=13';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=13';
-import { Particles, Debris } from './fx.js?v=13';
-import { Input } from './input.js?v=13';
-import { Sfx } from './audio.js?v=13';
+import { City } from './buildings.js?v=14';
+import { buildStructures } from './models.js?v=14';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=14';
+import { Particles, Debris } from './fx.js?v=14';
+import { Input } from './input.js?v=14';
+import { Sfx } from './audio.js?v=14';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=13')).json();
+  const data = await (await fetch('data/campus.json?v=14')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -524,7 +524,9 @@ async function main() {
   // A dark event horizon, a hot Keplerian accretion disk, gravitational lensing of
   // the whole screen around it, tidal "spaghettification" of everything it pulls in,
   // a dimming world and a rising drone; it ends in a collapse and a shockwave.
-  const BH_R = 60, BH_TIME = 5.0;
+  // the hole starts small and grows with everything it eats (radius ~ sqrt of swallowed chunks);
+  // it lives as long as it keeps feeding, up to BH_MAXLIFE seconds
+  const BH_R0 = 22, BH_EAT = 1.7, BH_RMAX = 170, BH_TIME = 5.0, BH_MAXLIFE = 16;
   const bh = { on: false, t: 0, p: new THREE.Vector3(), n: 0, tick: 0, r: 0, core: 0, lens: 0, gy: 0 };
   const bhCore = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), new THREE.MeshBasicMaterial({ color: 0x000000, fog: false }));
   const diskMat = new THREE.ShaderMaterial({
@@ -554,7 +556,7 @@ async function main() {
   const bhGroup = new THREE.Group(); bhGroup.add(bhCore, bhDisk); bhGroup.visible = false; scene.add(bhGroup);
   const bhHemi = { base: hemi.intensity, sun: sun.intensity };
   function startBlackHole(p) {
-    Object.assign(bh, { on: true, t: 0, n: 0, tick: 0, r: 0, lens: 0, shockT: -1 });
+    Object.assign(bh, { on: true, t: 0, n: 0, tick: 0, r: 0, lens: 0, shockT: -1, life: BH_TIME, step: 1 });
     bh.p.copy(p);
     bh.gy = terrain.height(p.x, p.z);
     bh.p.y = Math.max(p.y, bh.gy + 6);
@@ -584,9 +586,12 @@ async function main() {
     bh.p.y += (bh.gy + 18 - bh.p.y) * Math.min(1, dt * 1.2);
     bhGroup.position.copy(bh.p);
     if (debris.attract) debris.attract.y = bh.p.y;
-    const grow = Math.min(1, t / 2.8);
+    const grow = Math.min(1, t / 1.6);
     const g3 = grow * grow * (3 - 2 * grow);
-    bh.r = BH_R * g3;
+    const want = Math.min(BH_RMAX, (BH_R0 + BH_EAT * Math.sqrt(bh.n)) * g3);
+    bh.r += (want - bh.r) * Math.min(1, dt * 2.5);
+    S.boomScale = Math.max(2.3, bh.r / 24);
+    if (bh.r > 40 + bh.step * 20) { bh.step++; toast(`⚫ 블랙홀이 커지고 있어요! 반경 ${Math.round(bh.r)}m`, true); }
     bh.core = 1.2 + bh.r * 0.14;
     bh.lens = g3;
     bhCore.scale.setScalar(bh.core);
@@ -612,17 +617,18 @@ async function main() {
       const sp = 10 + bh.r * 0.3;
       smoke.spawn(x, terrain.height(x, z) + 1.5, z, (-Math.cos(a) * 0.6 - Math.sin(a)) * sp, 4 + Math.random() * 6, (-Math.sin(a) * 0.6 + Math.cos(a)) * sp, 5, 6, 2.2, 0.42, 0.39, 0.36, 0.7, 0.985, 3);
     }
-    if (t < BH_TIME) {
+    if (t < bh.life) {
       bh.tick -= dt;
       if (bh.tick <= 0) {
         bh.tick = 0.3;
         const { n, downMsg } = blast(bh.p.clone(), Math.max(4, bh.r), 0.5, null, true, false, true);
         bh.n += n;
+        if (n > 0) bh.life = Math.min(BH_MAXLIFE, Math.max(bh.life, t + 1.8)); // still feeding: stay alive
         if (downMsg) toast(downMsg, true);
       }
     } else {
       // collapse: the horizon shrinks to nothing, then a violet shockwave and flash
-      const c = Math.max(0, 1 - (t - BH_TIME) / 0.45);
+      const c = Math.max(0, 1 - (t - bh.life) / 0.45);
       bhGroup.scale.setScalar(Math.max(0.001, c * c));
       bh.lens = c;
       if (c === 0 && bhGroup.visible) {
