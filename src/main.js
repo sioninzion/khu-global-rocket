@@ -11,6 +11,22 @@ const setLoad = (t) => { $('loadMsg').textContent = t; };
 // yield so the loading text can paint (setTimeout also covers background tabs)
 const frame = () => new Promise((r) => { requestAnimationFrame(() => r()); setTimeout(r, 60); });
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+// phones/tablets get a lighter world (fewer triangles, no shadows by default, lower resolution)
+const MOBILE = matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+const Q = MOBILE
+  ? { dpr: 1.25, terrainStride: 2, trees: 3000, fire: 700, smoke: 1200, debris: 900, shadows: false, shadowMap: 1024 }
+  : { dpr: 1.75, terrainStride: 1, trees: 9000, fire: 1600, smoke: 2600, debris: 1800, shadows: true, shadowMap: 2048 };
+
+// show problems on screen instead of silently hanging
+function showError(msg) {
+  const el = document.getElementById('loadMsg');
+  if (el) el.textContent = '⚠️ ' + msg;
+  const t = document.getElementById('title');
+  if (t) t.classList.remove('hide');
+}
+addEventListener('error', (e) => showError('오류: ' + (e.message || e.error)));
+addEventListener('unhandledrejection', (e) => showError('오류: ' + (e.reason && e.reason.message || e.reason)));
+
 const KIND = { apartments: '아파트', house: '주택', school: '학교', college: '대학 건물', dormitory: '기숙사', commercial: '상가', retail: '상가', residential: '주거 건물' };
 
 async function main() {
@@ -19,8 +35,9 @@ async function main() {
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
-  const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: dpr < 1.5, powerPreference: 'high-performance' });
+  const dpr = Math.min(window.devicePixelRatio || 1, Q.dpr);
+  const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: !MOBILE && dpr < 1.5, powerPreference: 'high-performance' });
+  renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); showError('그래픽 메모리가 부족해요. 새로고침하면 다시 시도해요.'); });
   renderer.setPixelRatio(dpr);
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0xc9dbe8, 350, 2600);
@@ -33,10 +50,10 @@ async function main() {
   // sun shadows in a box that follows the camera
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  let shadowsOn = true;
-  try { shadowsOn = localStorage.getItem('khu-shadows') !== '0'; } catch { /* ignore */ }
+  let shadowsOn = Q.shadows;
+  try { const v = localStorage.getItem('khu-shadows'); if (v !== null) shadowsOn = v === '1'; } catch { /* ignore */ }
   sun.castShadow = shadowsOn;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(Q.shadowMap, Q.shadowMap);
   Object.assign(sun.shadow.camera, { left: -160, right: 160, top: 160, bottom: -160, near: 10, far: 1200 });
   sun.shadow.camera.updateProjectionMatrix();
   sun.shadow.bias = -0.0005;
@@ -49,17 +66,17 @@ async function main() {
   setLoad('지형 만드는 중…'); await frame();
   const terrain = new Terrain(data.terrain);
   const groundCanvas = drawGroundCanvas(data, terrain);
-  scene.add(buildTerrainMesh(terrain, groundCanvas));
-  scene.add(buildOuterGround(terrain));
+  scene.add(buildTerrainMesh(terrain, groundCanvas, Q.terrainStride));
+  scene.add(buildOuterGround(terrain, Q.terrainStride));
 
   setLoad('건물 조각내는 중…'); await frame();
   const city = new City(buildStructures(data), scene);
   setLoad('나무 심는 중…'); await frame();
-  for (const m of buildTrees(data, terrain, city)) scene.add(m);
+  for (const m of buildTrees(data, terrain, city, Q.trees)) scene.add(m);
 
-  const fire = new Particles(scene, 1600, true);
-  const smoke = new Particles(scene, 2600, false);
-  const debris = new Debris(scene, 1800, terrain);
+  const fire = new Particles(scene, Q.fire, true);
+  const smoke = new Particles(scene, Q.smoke, false);
+  const debris = new Debris(scene, Q.debris, terrain);
   const input = new Input();
   const sfx = new Sfx();
 
@@ -356,7 +373,7 @@ async function main() {
     tmp.copy(camLook).sub(camera.position).setY(0);
     const ahead = Math.min(tmp.length(), 90);
     tmp.normalize().multiplyScalar(ahead).add(camera.position);
-    const texel = 320 / 2048;
+    const texel = 320 / Q.shadowMap;
     tmp.x = Math.round(tmp.x / texel) * texel; tmp.z = Math.round(tmp.z / texel) * texel;
     tmp.y = terrain.height(tmp.x, tmp.z);
     sun.target.position.copy(tmp);
@@ -467,5 +484,5 @@ async function main() {
 
 main().catch((e) => {
   console.error(e);
-  setLoad('불러오기 실패: ' + e.message);
+  showError('불러오기 실패: ' + e.message);
 });

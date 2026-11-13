@@ -117,9 +117,25 @@ function makeRoof(spec, pts) {
 }
 
 // ------------------------------------------------------------ geometry builder
+// Compact vertex format (~30 bytes/vertex instead of 60) in growable typed arrays,
+// so building the city doesn't spike memory on phones.
+//   position f32x3, normal i8x3 (normalized), colour u8x3 (normalized),
+//   aFac u8x4 (style, floorH*20, bay*20, groundH*20), aFuv f32x2
 class GeoBuilder {
-  constructor() { this.pos = []; this.nor = []; this.col = []; this.fac = []; this.fuv = []; }
-  get count() { return this.pos.length / 3; }
+  constructor(cap = 4096) {
+    this.n = 0; this.cap = cap;
+    this.pos = new Float32Array(cap * 3); this.nor = new Int8Array(cap * 3); this.col = new Uint8Array(cap * 3);
+    this.fac = new Uint8Array(cap * 4); this.fuv = new Float32Array(cap * 2);
+  }
+  get count() { return this.n; }
+  grow(need) {
+    if (need <= this.cap) return;
+    let cap = this.cap;
+    while (cap < need) cap *= 2;
+    const g = (a, k) => { const b = new a.constructor(cap * k); b.set(a); return b; };
+    this.pos = g(this.pos, 3); this.nor = g(this.nor, 3); this.col = g(this.col, 3); this.fac = g(this.fac, 4); this.fuv = g(this.fuv, 2);
+    this.cap = cap;
+  }
   // triangle with true flat normal; winding flipped so the normal agrees with `hint`
   tri(a, b, c, hint, col, fac, ua, ub, uc) {
     const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
@@ -128,14 +144,19 @@ class GeoBuilder {
     const L = Math.hypot(nx, ny, nz);
     if (L < 1e-9) return;
     if (nx * hint[0] + ny * hint[1] + nz * hint[2] < 0) { let t = b; b = c; c = t; t = ub; ub = uc; uc = t; nx = -nx; ny = -ny; nz = -nz; }
-    nx /= L; ny /= L; nz /= L;
-    this.pos.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+    const qx = Math.round(nx / L * 127), qy = Math.round(ny / L * 127), qz = Math.round(nz / L * 127);
+    const cr = Math.round(Math.min(1, col.r) * 255), cg = Math.round(Math.min(1, col.g) * 255), cb = Math.round(Math.min(1, col.b) * 255);
+    const f0 = fac[0], f1 = Math.min(255, Math.round(fac[1] * 20)), f2 = Math.min(255, Math.round(fac[2] * 20)), f3 = Math.min(255, Math.round(fac[3] * 20));
+    this.grow(this.n + 3);
+    const V = [a, b, c], U = [ua, ub, uc];
     for (let k = 0; k < 3; k++) {
-      this.nor.push(nx, ny, nz);
-      this.col.push(col.r, col.g, col.b);
-      this.fac.push(fac[0], fac[1], fac[2], fac[3]);
+      const i = this.n++;
+      this.pos[i * 3] = V[k][0]; this.pos[i * 3 + 1] = V[k][1]; this.pos[i * 3 + 2] = V[k][2];
+      this.nor[i * 3] = qx; this.nor[i * 3 + 1] = qy; this.nor[i * 3 + 2] = qz;
+      this.col[i * 3] = cr; this.col[i * 3 + 1] = cg; this.col[i * 3 + 2] = cb;
+      this.fac[i * 4] = f0; this.fac[i * 4 + 1] = f1; this.fac[i * 4 + 2] = f2; this.fac[i * 4 + 3] = f3;
+      this.fuv[i * 2] = U[k][0]; this.fuv[i * 2 + 1] = U[k][1];
     }
-    this.fuv.push(ua[0], ua[1], ub[0], ub[1], uc[0], uc[1]);
   }
   quad(a, b, c, d, hint, col, fac, uv) {
     const Z = [0, 0];
@@ -143,13 +164,16 @@ class GeoBuilder {
     this.tri(a, c, d, hint, col, fac, uv ? uv[0] : Z, uv ? uv[2] : Z, uv ? uv[3] : Z);
   }
   toGeometry() {
+    const n = this.n;
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.pos), 3));
-    g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(this.nor), 3));
-    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(this.col), 3));
-    g.setAttribute('aFac', new THREE.BufferAttribute(new Float32Array(this.fac), 4));
-    g.setAttribute('aFuv', new THREE.BufferAttribute(new Float32Array(this.fuv), 2));
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos.slice(0, n * 3), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(this.nor.slice(0, n * 3), 3, true));
+    g.setAttribute('color', new THREE.BufferAttribute(this.col.slice(0, n * 3), 3, true));
+    g.setAttribute('aFac', new THREE.BufferAttribute(this.fac.slice(0, n * 4), 4, false));
+    g.setAttribute('aFuv', new THREE.BufferAttribute(this.fuv.slice(0, n * 2), 2));
     g.computeBoundingSphere();
+    // free the builder's scratch arrays right away
+    this.pos = this.nor = this.col = this.fac = this.fuv = null;
     return g;
   }
 }
@@ -479,8 +503,52 @@ export class Building {
     }
   }
 
+  // whole-wall ornaments for an intact flat-roofed part (one band per wall, not per chunk)
+  ornamentsWhole(gb) {
+    const st = this.style, B = this.base;
+    for (const e of this.edges) {
+      const a = [e.ax, e.az], b = [e.bx, e.bz];
+      if (st.cornice) this.band(gb, a, b, e, this.ytop - st.cornice.h, this.ytop + 0.05, st.cornice.d, this.trim, st.cornice.d, st.cornice.d);
+      if (st.parapet) {
+        const ph = st.parapet, nx = e.uz, nz = -e.ux, t = 0.35, yA = this.ytop, yB = this.ytop + ph;
+        gb.quad([a[0], yA, a[1]], [b[0], yA, b[1]], [b[0], yB, b[1]], [a[0], yB, a[1]], [nx, 0, nz], this.color, PLAIN);
+        const ai = [a[0] - nx * t, a[1] - nz * t], bi = [b[0] - nx * t, b[1] - nz * t];
+        gb.quad([ai[0], yA, ai[1]], [bi[0], yA, bi[1]], [bi[0], yB, bi[1]], [ai[0], yB, ai[1]], [-nx, 0, -nz], this.color, PLAIN);
+        gb.quad([a[0], yB, a[1]], [b[0], yB, b[1]], [bi[0], yB, bi[1]], [ai[0], yB, ai[1]], [0, 1, 0], this.trim, PLAIN);
+      }
+      if (st.plinth && !this.floating) this.band(gb, a, b, e, this.ybot, B + st.plinth.h, st.plinth.d, this.plinthCol, st.plinth.d, st.plinth.d);
+      for (const bd of st.bands) if (B + bd.y > this.ybot && B + bd.y < this.ytop) this.band(gb, a, b, e, B + bd.y, B + bd.y + bd.h, bd.d, this.trim, bd.d, bd.d);
+      const pl = st.pilaster;
+      if (pl && !e.blank) {
+        const sp = e.bay * (pl.every || 1);
+        const capTop = B + (pl.to ?? (this.ytop - B));
+        const yA = Math.max(this.ybot, B + (pl.from || 0));
+        for (let k = 1; k * sp <= e.len + 1e-6; k++) {
+          const u = k * sp;
+          if (u < pl.w * 0.6 || u > e.len - pl.w * 0.6) continue;
+          this.boxOut(gb, e, u, pl.w, pl.d, yA, capTop - 0.9, this.trim, false);
+          this.boxOut(gb, e, u, pl.w * 1.45, pl.d * 1.5, capTop - 0.9, capTop, this.trim, true);
+        }
+      }
+    }
+  }
+
   buildIntact(gb) {
     const start = gb.count;
+    if (!this.roof.max) {
+      // flat roof: one quad per wall and one roof polygon (much lighter than per chunk)
+      const B = this.base;
+      for (const e of this.edges) {
+        gb.quad([e.ax, this.ybot, e.az], [e.bx, this.ybot, e.bz], [e.bx, this.ytop, e.bz], [e.ax, this.ytop, e.az], [e.uz, 0, -e.ux], this.color, this.facFor(e),
+          [[0, this.ybot - B], [e.len, this.ybot - B], [e.len, this.ytop - B], [0, this.ytop - B]]);
+      }
+      const whole = { pts: this.pts, tris: null };
+      this.cap(gb, whole, () => this.ytop, true, this.roofCol);
+      if (this.floating) this.cap(gb, whole, () => this.ybot, false, this.trim);
+      this.ornamentsWhole(gb);
+      this.range = [start, gb.count - start];
+      return;
+    }
     const top = (x, z) => this.topAt(x, z);
     for (const p of this.pieces) {
       const n = p.pts.length;

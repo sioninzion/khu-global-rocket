@@ -66,23 +66,34 @@ export function drawGroundCanvas(data, terrain, size = 2048) {
   return c;
 }
 
-export function buildTerrainMesh(terrain, groundCanvas) {
+// grid sample indices for a given stride (always includes the last row/column)
+export function strideIdx(n, stride) {
+  const out = [];
+  for (let i = 0; i < n - 1; i += stride) out.push(i);
+  out.push(n - 1);
+  return out;
+}
+
+export function buildTerrainMesh(terrain, groundCanvas, stride = 1) {
   const { nx, nz, step, x0, z0, h } = terrain;
-  const pos = new Float32Array(nx * nz * 3), uv = new Float32Array(nx * nz * 2);
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
-    const k = j * nx + i;
-    pos[k * 3] = x0 + i * step; pos[k * 3 + 1] = h[k]; pos[k * 3 + 2] = z0 + j * step;
+  const is = strideIdx(nx, stride), js = strideIdx(nz, stride);
+  const NX = is.length, NZ = js.length;
+  const pos = new Float32Array(NX * NZ * 3), uv = new Float32Array(NX * NZ * 2);
+  for (let b = 0; b < NZ; b++) for (let a = 0; a < NX; a++) {
+    const i = is[a], j = js[b], k = b * NX + a;
+    pos[k * 3] = x0 + i * step; pos[k * 3 + 1] = h[j * nx + i]; pos[k * 3 + 2] = z0 + j * step;
     uv[k * 2] = i / (nx - 1); uv[k * 2 + 1] = 1 - j / (nz - 1);
   }
-  const idx = [];
-  for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
-    const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
-    idx.push(a, c, b, b, c, d);
+  const idx = new Uint32Array((NX - 1) * (NZ - 1) * 6);
+  let o = 0;
+  for (let j = 0; j < NZ - 1; j++) for (let i = 0; i < NX - 1; i++) {
+    const a = j * NX + i, b = a + 1, c = a + NX, d = c + 1;
+    idx[o++] = a; idx[o++] = c; idx[o++] = b; idx[o++] = b; idx[o++] = c; idx[o++] = d;
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  geo.setIndex(idx);
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
   geo.computeVertexNormals();
   const tex = new THREE.CanvasTexture(groundCanvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -115,14 +126,14 @@ float tNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 *
 }
 
 // low-detail hills around the mapped area so the world has no visible edge
-export function buildOuterGround(terrain) {
+export function buildOuterGround(terrain, stride = 1) {
   const xs = [], zs = [];
   const ring = [4500, 2500, 1400, 800, 450, 220, 90];
   for (const d of ring) xs.push(terrain.x0 - d);
-  for (let i = 0; i < terrain.nx; i++) xs.push(terrain.x0 + i * terrain.step);
+  for (const i of strideIdx(terrain.nx, stride)) xs.push(terrain.x0 + i * terrain.step);
   for (const d of ring.slice().reverse()) xs.push(terrain.x1 + d);
   for (const d of ring) zs.push(terrain.z0 - d);
-  for (let j = 0; j < terrain.nz; j++) zs.push(terrain.z0 + j * terrain.step);
+  for (const j of strideIdx(terrain.nz, stride)) zs.push(terrain.z0 + j * terrain.step);
   for (const d of ring.slice().reverse()) zs.push(terrain.z1 + d);
   const NX = xs.length, NZ = zs.length;
   const pos = new Float32Array(NX * NZ * 3), col = new Float32Array(NX * NZ * 3);
@@ -151,10 +162,9 @@ export function buildOuterGround(terrain) {
   return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
 }
 
-export function buildTrees(data, terrain, city) {
+export function buildTrees(data, terrain, city, MAX = 9000) {
   const rnd = makeRng(42);
   const spots = [];
-  const MAX = 9000;
   const areas = data.areas.slice().sort((a, b) => (a.k === 'wood' ? 0 : 1) - (b.k === 'wood' ? 0 : 1));
   for (const a of areas) {
     const dens = a.k === 'wood' ? 1 / 55 : a.k === 'grass' ? 1 / 450 : a.k === 'edu' || a.k === 'res' ? 1 / 900 : 0;

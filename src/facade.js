@@ -129,7 +129,7 @@ export function makeFacadeMaterial(opts = {}) {
   m.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 aFac;\nattribute vec2 aFuv;\nvarying vec4 vFac;\nvarying vec2 vFuv;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFac = aFac;\nvFuv = aFuv;');
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFac = vec4(aFac.x, aFac.yzw / 20.0);\nvFuv = aFuv;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\n' + GLSL)
       .replace('#include <color_fragment>', '#include <color_fragment>\nfacadeShade(diffuseColor.rgb);')
