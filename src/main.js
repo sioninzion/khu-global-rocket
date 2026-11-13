@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=39';
-import { buildStructures } from './models.js?v=39';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=39';
-import { Particles, Debris } from './fx.js?v=39';
-import { Input } from './input.js?v=39';
-import { Sfx } from './audio.js?v=39';
+import { City } from './buildings.js?v=40';
+import { buildStructures } from './models.js?v=40';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=40';
+import { Particles, Debris } from './fx.js?v=40';
+import { Input } from './input.js?v=40';
+import { Sfx } from './audio.js?v=40';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +33,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=39')).json();
+  const data = await (await fetch('data/campus.json?v=40')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -622,14 +622,31 @@ async function main() {
     for (const b of st.parts) { if (b.aliveCount <= 0) continue; x += (b.minx + b.maxx) / 2; z += (b.minz + b.maxz) / 2; n++; }
     return n ? [x / n, z / n] : null;
   }
-  function aimPoint(st) { // a random surviving chunk of that building
-    const parts = st.parts.filter(b => b.aliveCount > 0 && !b.floating);
-    const b = parts[Math.floor(Math.random() * parts.length)] || st.parts.find(q => q.aliveCount > 0);
-    for (let tries = 0; tries < 30; tries++) {
-      const c = Math.floor(Math.random() * b.total);
-      if (b.alive[c]) { const ci = b.chunkInfo(c); return new THREE.Vector3(ci.x, ci.y, ci.z); }
+  // a random chunk of that building that is still standing (searches every part, not just a few random tries)
+  function aimPoint(st) {
+    const parts = st.parts.filter(b => b.aliveCount > 0);
+    if (!parts.length) return null;
+    const solid = parts.filter(b => !b.floating);
+    const pool = solid.length ? solid : parts;
+    const b = pool[Math.floor(Math.random() * pool.length)];
+    let c = Math.floor(Math.random() * b.total);
+    for (let i = 0; i < b.total && !b.alive[c]; i++) c = (c + 1) % b.total;
+    if (!b.alive[c]) return null;
+    const ci = b.chunkInfo(c);
+    // never aim below the ground (the lowest floor chunks sit partly underground)
+    const v = new THREE.Vector3(ci.x, Math.max(ci.y, terrain.height(ci.x, ci.z) + 2.5), ci.z);
+    v.b = b; v.c = c; // remember which chunk, so the warhead can notice when it is already gone
+    return v;
+  }
+  const aimDead = (a) => !a || (a.b && !a.b.alive[a.c]);
+  // keep each warhead on something that is still standing: same building if possible, otherwise a new target
+  function reaim(h) {
+    let a = h.st.parts.some(b => b.aliveCount > 0) ? aimPoint(h.st) : null;
+    if (!a) {
+      const tg = pickTarget();
+      if (tg) { h.st = tg.st; a = aimPoint(tg.st); }
     }
-    return new THREE.Vector3((b.minx + b.maxx) / 2, (b.base + b.ytop) / 2, (b.minz + b.maxz) / 2);
+    if (a) h.aim = a;
   }
   function pickTarget() {
     const hx = Math.sin(S.yaw), hz = -Math.cos(S.yaw);
@@ -638,6 +655,7 @@ async function main() {
     for (const st of city.structures) {
       const c = structCenter(st);
       if (!c) continue;
+      if (st.parts.reduce((t, b) => t + b.aliveCount, 0) < st.total * 0.08) continue; // already mostly destroyed
       const dx = c[0] - S.pos.x, dz = c[1] - S.pos.z, d = Math.hypot(dx, dz);
       if (d < nd && d > 30) { nd = d; nearest = st; }
       if (d < H_MIN || d > H_MAXD) continue;
@@ -670,7 +688,7 @@ async function main() {
     // half the salvo climbs twice as high in the same time (50 m vs 100 m; fallback 70 m vs 140 m)
     const cs = k % 2 ? 2 : 1;
     hunters.push({ mesh, p, v: new THREE.Vector3(fwd.x * 8 + Math.cos(sa) * sm, (6 + Math.random() * 2) * cs, fwd.z * 8 + Math.sin(sa) * sm), phase: 'climb', dt: 0, cs,
-      topY: (tg.fallback ? S.pos.y : p.y) + tg.climb * cs, st: tg.st, aim: aimPoint(tg.st), t: 0, speed: 20 });
+      topY: (tg.fallback ? S.pos.y : p.y) + tg.climb * cs, st: tg.st, aim: aimPoint(tg.st) || S.pos.clone(), t: 0, speed: 20 });
     sfx.boom(0.12);
   }
   function updateHunters(dt) {
@@ -684,14 +702,14 @@ async function main() {
         h.v.y = Math.min(40 * h.cs, h.v.y + 30 * h.cs * dt);
         if (h.p.y >= h.topY || h.t > 8) {
           h.phase = 'dive'; h.dt = 0; h.speed = Math.max(15, h.v.length() * 0.5);
-          if (h.st.parts.every(b => b.aliveCount <= 0)) { const tg = pickTarget(); if (tg) { h.st = tg.st; } }
-          h.aim = aimPoint(h.st);
+          reaim(h);
         }
       } else {
         // dive: home on the aim point, accelerating
         // accelerating dive: the push grows the longer it flies (slow start, then a sharp rush)
         h.dt += dt;
         h.speed = Math.min(H_VMAX, h.speed + (25 + 220 * h.dt) * dt);
+        if (aimDead(h.aim)) reaim(h); // its spot was already blown away: pick a standing chunk instead
         const want = tmp.copy(h.aim).sub(h.p).normalize().multiplyScalar(h.speed);
         h.v.lerp(want, Math.min(1, dt * 4));
       }
