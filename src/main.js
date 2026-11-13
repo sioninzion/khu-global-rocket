@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=11';
-import { buildStructures } from './models.js?v=11';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=11';
-import { Particles, Debris } from './fx.js?v=11';
-import { Input } from './input.js?v=11';
-import { Sfx } from './audio.js?v=11';
+import { City } from './buildings.js?v=12';
+import { buildStructures } from './models.js?v=12';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=12';
+import { Particles, Debris } from './fx.js?v=12';
+import { Input } from './input.js?v=12';
+import { Sfx } from './audio.js?v=12';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -31,7 +31,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=11')).json();
+  const data = await (await fetch('data/campus.json?v=12')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -1016,7 +1016,7 @@ async function main() {
     $('speed').textContent = Math.round(S.speed * 3.6);
     $('alt').textContent = Math.max(0, Math.round(agl));
     const gauge = S.weapon === 'nuke' || S.weapon === 'blackhole' ? 1 : S.weapon === 'ballistic' ? (S.dashed ? 0 : 1) : S.weapon === 'cluster' ? (S.clustered ? 0 : 1) : S.weapon === 'bomber' ? S.charges / MAX_CHARGES : S.fuel;
-    $('boostFill').style.transform = `scaleX(${gauge.toFixed(3)})`;
+    $('ringFill').style.strokeDashoffset = (289 * (1 - gauge)).toFixed(1);
     $('boostBtn').classList.toggle('empty', S.weapon === 'cluster' ? S.clustered : S.weapon === 'ballistic' ? S.dashed : S.weapon === 'bomber' ? S.charges < 1 : S.fuel < 0.12 && !S.boosting);
     if (S.weapon === 'bomber') $('skillName').textContent = `폭탄 ×${Math.floor(S.charges)}`;
   }

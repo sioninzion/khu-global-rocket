@@ -38,20 +38,22 @@
   #joyBase.on { margin: -65px 0 0 -65px; background: rgba(255,255,255,.18); }
   #joyKnob { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; border-radius: 50%; background: rgba(255,255,255,.85);
     transform: translate(-50%, -50%); box-shadow: 0 2px 8px rgba(0,0,0,.35); }
-  #boostWrap { position: fixed; z-index: 3; right: calc(36px + var(--safe-r)); bottom: calc(40px + var(--safe-b)); pointer-events: none; display: none; text-align: center; }
+  #boostWrap { position: fixed; z-index: 3; right: calc(40px + var(--safe-r)); bottom: calc(44px + var(--safe-b)); pointer-events: none; display: none; text-align: center; }
   body.playing #boostWrap { display: block; }
-  #boostBtn { width: 118px; height: 118px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; letter-spacing: 1px;
-    background: radial-gradient(circle at 50% 35%, #ff9f43, #e2442f 70%); border: 3px solid rgba(255,255,255,.75); box-shadow: 0 6px 18px rgba(226,68,47,.45);
-    transition: transform .06s; }
-  #boostBtn.on { transform: scale(.92); background: radial-gradient(circle at 50% 35%, #ffd36b, #ff6a2f 70%); box-shadow: 0 0 30px rgba(255,160,60,.9); }
-  #boostBtn.empty { filter: grayscale(.8) brightness(.7); }
-  #boostBar { width: 118px; height: 8px; margin-top: 8px; border-radius: 4px; background: rgba(0,0,0,.4); overflow: hidden; }
-  #boostFill { width: 100%; height: 100%; background: linear-gradient(90deg, #ffb347, #ff5e3a); transform-origin: left; }
-  #boostBtn small { font-size: 11px; font-weight: 700; letter-spacing: 0; opacity: .9; margin-top: 2px; }
-  body.ballistic #boostBtn { background: radial-gradient(circle at 50% 35%, #9fb36b, #4f5a2c 70%); box-shadow: 0 6px 18px rgba(80,90,40,.5); }
-  body.bomber #boostBtn { background: radial-gradient(circle at 50% 35%, #8a9096, #3e4347 70%); box-shadow: 0 6px 18px rgba(40,40,40,.5); }
-  body.bomber #boostBtn.on { background: radial-gradient(circle at 50% 35%, #ffb36b, #e0782a 70%); }
-  body.ballistic #boostBtn.on { background: radial-gradient(circle at 50% 35%, #ffe08a, #ff8a2f 70%); }
+  /* minimal skill button: flat weapon colour, thin progress ring as the gauge */
+  :root { --skill: #e2442f; --skill-ink: #fff; }
+  body.ballistic { --skill: #5d6b35; } body.bomber { --skill: #4a5056; } body.cluster { --skill: #2f5d9c; }
+  body.nuke { --skill: #d9a800; --skill-ink: #1e1f1c; } body.airstrike { --skill: #138aa6; } body.blackhole { --skill: #5b2fb0; }
+  #boostBtn { position: relative; width: 92px; height: 92px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--skill); color: var(--skill-ink); opacity: .9; box-shadow: 0 2px 10px rgba(0,0,0,.25); transition: transform .08s, opacity .15s, filter .15s; }
+  #boostBtn .cap { font-size: 10px; font-weight: 600; letter-spacing: 2px; opacity: .75; }
+  #boostBtn #skillName { font-size: 15px; font-weight: 700; letter-spacing: .5px; margin-top: 1px; }
+  #boostBtn .ring { position: absolute; inset: -7px; width: calc(100% + 14px); height: calc(100% + 14px); transform: rotate(-90deg); pointer-events: none; }
+  #boostBtn .ring circle { fill: none; stroke-width: 3; }
+  #boostBtn .ring .track { stroke: rgba(255,255,255,.18); }
+  #boostBtn .ring .fill { stroke: rgba(255,255,255,.9); stroke-linecap: round; stroke-dasharray: 289; stroke-dashoffset: 0; transition: stroke-dashoffset .1s linear; }
+  #boostBtn.on { transform: scale(.93); opacity: 1; filter: brightness(1.15); }
+  #boostBtn.empty { opacity: .45; filter: saturate(.4); }
   #weapons { position: fixed; z-index: 4; top: calc(10px + var(--safe-t)); left: 50%; transform: translateX(-50%); display: none; gap: 6px; }
   body.playing #weapons { display: flex; }
   #weapons button { font: inherit; font-size: 13px; font-weight: 700; color: #fff; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.35);
@@ -61,15 +63,10 @@
   @media (max-width: 1180px) { #weapons .wl { display: none; } #weapons .ws { display: inline; } }
   @media (max-aspect-ratio: 1/1) { #weapons { width: 94vw; } #toast { top: 30%; } }
   @media (min-aspect-ratio: 1/1) and (max-height: 500px) { #toast { top: 30%; } }
-  body.nuke #boostBtn { background: radial-gradient(circle at 50% 35%, #ffe066, #c99a00 70%); color: #1e1f1c; }
-  body.blackhole #boostBtn { background: radial-gradient(circle at 50% 35%, #b07dff, #1c1030 70%); box-shadow: 0 0 22px rgba(160,100,255,.6); }
-  body.airstrike #boostBtn { background: radial-gradient(circle at 50% 35%, #7ff6ff, #127f99 70%); }
   #flash { position: fixed; inset: 0; z-index: 5; background: #fff; opacity: 0; pointer-events: none; }
   #flash.go { animation: nflash 2.4s ease-out forwards; }
   @keyframes nflash { 0% { opacity: 1; } 15% { opacity: .95; } 100% { opacity: 0; } }
   @media (max-width: 420px) { #weapons button { font-size: 11.5px; padding: 6px 7px; } #weapons { gap: 4px; } }
-  body.cluster #boostBtn { background: radial-gradient(circle at 50% 35%, #8fb4e6, #2f5d9c 70%); box-shadow: 0 6px 18px rgba(47,93,156,.5); }
-  body.cluster #boostBtn.on { background: radial-gradient(circle at 50% 35%, #ffe6a0, #ff9a3c 70%); }
   #weapons button.on { background: rgba(255,120,70,.8); border-color: #fff; }
   #weapons button.locked { opacity: .55; }
   #weapons small { font-size: 11px; opacity: .9; }
@@ -129,7 +126,10 @@
   <button id="wAir" class="locked">🛰️ <span class="wl">공중 지원</span><span class="ws">지원</span> <small>🔒12000</small></button>
   <button id="wBlack" class="locked">⚫ <span class="wl">블랙홀</span><span class="ws">블랙홀</span> <small>🔒20000</small></button>
 </div>
-<div id="boostWrap"><div id="boostBtn">스킬<small id="skillName">부스트</small></div><div id="boostBar"><div id="boostFill"></div></div></div>
+<div id="boostWrap"><div id="boostBtn">
+  <svg class="ring" viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="46"/><circle class="fill" id="ringFill" cx="50" cy="50" r="46"/></svg>
+  <span class="cap">스킬</span><span id="skillName">부스트</span>
+</div></div>
 <div id="btns">
   <button id="btnInvert" title="상하 반전">↕ 반전</button>
   <button id="btnShadow" title="그림자">🌗</button>
@@ -151,6 +151,6 @@
   </div>
 </div>
 
-<script type="module" src="src/main.js?v=11"></script>
+<script type="module" src="src/main.js?v=12"></script>
 </body>
 </html>
