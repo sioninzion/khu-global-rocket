@@ -1,6 +1,6 @@
 // Terrain, ground map texture, surrounding hills, trees and sky.
 import * as THREE from 'three';
-import { pip, makeRng } from './buildings.js?v=42';
+import { pip, makeRng } from './buildings.js?v=43';
 
 export class Terrain {
   constructor(t) {
@@ -241,16 +241,27 @@ export function buildSky() {
   const geo = new THREE.SphereGeometry(5000, 32, 16);
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { sun: { value: new THREE.Vector3(0.45, 0.55, -0.7).normalize() } },
+    uniforms: { sun: { value: new THREE.Vector3(0.45, 0.55, -0.7).normalize() }, moon: { value: new THREE.Vector3(-0.5, 0.45, 0.6).normalize() }, uNight: { value: 0 } },
     vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-    fragmentShader: `uniform vec3 sun; varying vec3 vDir;
+    fragmentShader: `uniform vec3 sun, moon; uniform float uNight; varying vec3 vDir;
+      float hash3(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
       void main(){
-        float h = clamp(vDir.y, -0.2, 1.0);
+        vec3 d = normalize(vDir);
+        float h = clamp(d.y, -0.2, 1.0);
         vec3 top = vec3(0.30,0.52,0.86), hor = vec3(0.80,0.88,0.95), low = vec3(0.62,0.70,0.66);
         vec3 c = h > 0.0 ? mix(hor, top, pow(h, 0.6)) : mix(hor, low, -h*5.0);
-        float s = max(dot(normalize(vDir), sun), 0.0);
+        float s = max(dot(d, sun), 0.0);
         c += vec3(1.0,0.9,0.7) * (pow(s, 600.0) * 2.0 + pow(s, 12.0) * 0.18);
-        gl_FragColor = vec4(c, 1.0);
+        // night: deep blue sky, city glow on the horizon, stars and a moon
+        vec3 nTop = vec3(0.01, 0.015, 0.05), nHor = vec3(0.07, 0.08, 0.16), nLow = vec3(0.03, 0.035, 0.05);
+        vec3 n = h > 0.0 ? mix(nHor, nTop, pow(h, 0.5)) : mix(nHor, nLow, -h*5.0);
+        n += vec3(0.20, 0.12, 0.06) * exp(-max(h, 0.0) * 18.0) * 0.6;
+        vec3 g = floor(d * 380.0);
+        float st = step(0.9965, hash3(g)) * smoothstep(0.02, 0.25, h);
+        n += vec3(0.9, 0.92, 1.0) * st * (0.4 + 0.6 * hash3(g + 7.0));
+        float mo = max(dot(d, moon), 0.0);
+        n += vec3(0.95, 0.95, 0.88) * smoothstep(0.9993, 0.9996, mo) + vec3(0.25, 0.28, 0.4) * pow(mo, 40.0) * 0.5;
+        gl_FragColor = vec4(mix(c, n, uNight), 1.0);
       }`,
   });
   const m = new THREE.Mesh(geo, mat);

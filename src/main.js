@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { City } from './buildings.js?v=42';
-import { buildStructures } from './models.js?v=42';
-import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=42';
-import { Particles, Debris } from './fx.js?v=42';
-import { Input } from './input.js?v=42';
-import { Sfx } from './audio.js?v=42';
+import { NIGHT } from './facade.js?v=43';
+import { City } from './buildings.js?v=43';
+import { buildStructures } from './models.js?v=43';
+import { Terrain, drawGroundCanvas, buildTerrainMesh, buildOuterGround, buildTrees, buildSky } from './world.js?v=43';
+import { Particles, Debris } from './fx.js?v=43';
+import { Input } from './input.js?v=43';
+import { Sfx } from './audio.js?v=43';
 
 const $ = (id) => document.getElementById(id);
 const setLoad = (t) => { $('loadMsg').textContent = t; };
@@ -33,7 +34,7 @@ const KIND = { apartments: '아파트', house: '주택', school: '학교', colle
 
 async function main() {
   setLoad('캠퍼스 지도 불러오는 중…');
-  const data = await (await fetch('data/campus.json?v=42')).json();
+  const data = await (await fetch('data/campus.json?v=43')).json();
   await frame();
 
   // ------------------------------------------------------------ renderer / scene
@@ -62,6 +63,9 @@ async function main() {
   sun.shadow.bias = -0.0005;
   sun.shadow.normalBias = 0.5;
   const flash = new THREE.PointLight(0xffa955, 0, 160, 1.2);
+  const engineLight = new THREE.PointLight(0xff9a40, 0, 70, 1.6); // rocket exhaust glow (night only)
+  scene.add(engineLight);
+  let night = false;
   scene.add(flash);
   const sky = buildSky();
   scene.add(sky);
@@ -827,6 +831,7 @@ async function main() {
   bhShock.rotation.x = Math.PI / 2; bhShock.visible = false; scene.add(bhShock);
   const bhGroup = new THREE.Group(); bhGroup.add(bhCore, bhDisk); bhGroup.visible = false; scene.add(bhGroup);
   const bhHemi = { base: hemi.intensity, sun: sun.intensity };
+  window.__bhHemi = bhHemi;
   function startBlackHole(p) {
     Object.assign(bh, { on: true, t: 0, n: 0, tick: 0, r: 0, lens: 0, shockT: -1, life: BH_TIME, step: 1 });
     bh.p.copy(p);
@@ -1301,6 +1306,7 @@ async function main() {
     }
 
     rocket.position.copy(S.pos);
+    engineLight.position.copy(S.pos); engineLight.intensity = night && S.mode === 'flight' ? (S.boosting ? 900 : 500) : 0;
     rocket.rotation.set(S.pitch, -S.yaw, S.roll, 'YXZ');
 
     if (dropped.obj) {
@@ -1486,6 +1492,30 @@ async function main() {
   });
 
   // ------------------------------------------------------------ UI
+  // night mode: moonlit sky with stars, lit windows, dark fog; explosions and flames glow
+  const DAY = { fog: new THREE.Color(0xc9dbe8), hemiSky: new THREE.Color(0xe4f0ff), hemiGround: new THREE.Color(0x6a7352), hemi: 1.15, sun: 2.9, sunCol: new THREE.Color(0xfff0dc) };
+  const NIGHTL = { fog: new THREE.Color(0x0b1020), hemiSky: new THREE.Color(0x6f86b8), hemiGround: new THREE.Color(0x1a1f24), hemi: 0.42, sun: 0.75, sunCol: new THREE.Color(0xa8bde0) };
+  function setNight(on) {
+    night = on;
+    const L = on ? NIGHTL : DAY;
+    NIGHT.value = on ? 1 : 0;
+    sky.material.uniforms.uNight.value = on ? 1 : 0;
+    scene.fog.color.copy(L.fog);
+    scene.fog.near = on ? 200 : 350; scene.fog.far = on ? 1900 : 2600;
+    hemi.color.copy(L.hemiSky); hemi.groundColor.copy(L.hemiGround); hemi.intensity = L.hemi;
+    sun.color.copy(L.sunCol); sun.intensity = L.sun;
+    SUN_DIR.set(on ? -0.5 : 0.45, on ? 0.45 : 0.55, on ? 0.6 : -0.7).normalize(); // moonlight comes from the moon in the sky
+    if (window.__bhHemi) { window.__bhHemi.base = L.hemi; window.__bhHemi.sun = L.sun; }
+    renderer.setClearColor(L.fog);
+    try { localStorage.setItem('khu-night', on ? '1' : '0'); } catch { /* ignore */ }
+  }
+  let nightPref = false;
+  try { nightPref = localStorage.getItem('khu-night') === '1'; } catch { /* ignore */ }
+  setNight(nightPref);
+  $('optNight').checked = nightPref;
+  $('optNight').addEventListener('change', (e) => setNight(e.target.checked));
+  window.__game.setNight = setNight;
+
   // settings panel (pauses the game while open)
   let muted = false;
   try { muted = localStorage.getItem('khu-mute') === '1'; } catch { /* ignore */ }

@@ -14,6 +14,8 @@ const GLSL = /* glsl */`
 varying vec4 vFac;
 varying vec2 vFuv;
 float facGlass = 0.0;
+float facLit = 0.0;
+uniform float uNight;
 
 float fHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float fFill(float d, float aa) { return 1.0 - smoothstep(-aa, aa, d); }
@@ -92,6 +94,9 @@ void facadeShade(inout vec3 col) {
   if (st == 10) glass = vec3(0.07, 0.06, 0.06);
   if (st == 12) glass = vec3(0.62, 0.74, 0.74);
   float r = fHash(vec2(bay, fl));
+  // at night roughly 45% of rooms have their lights on (warm, a few cool-white)
+  float on = step(0.55, fHash(vec2(bay * 1.37 + 3.1, fl * 2.11 + 7.7)));
+  float tint = fHash(vec2(fl * 5.3, bay * 0.7));
   glass *= 0.8 + 0.4 * r;
   glass += vec3(0.07, 0.08, 0.09) * smoothstep(0.3, 1.0, (py - wy0) / max(wy1 - wy0, 0.1));
   if (st != 10 && r > 0.82) glass = mix(glass, vec3(0.80, 0.78, 0.70), 0.35); // drawn blinds
@@ -119,22 +124,27 @@ void facadeShade(inout vec3 col) {
   vec3 avg = mix(col * 0.95, glass, cover * 0.85);
   col = mix(c, avg, lod);
   facGlass = (st == 10 || st == 12) ? 0.0 : mix(m, cover * 0.6, lod);
+  facLit = (st == 10 ? 0.0 : 1.0) * on * mix(m, cover * 0.55, lod) * (0.7 + 0.6 * tint);
+  facGlass *= 1.0 - uNight;
   // grime / ambient occlusion towards the ground
   col *= mix(0.78, 1.0, smoothstep(-0.5, 2.5, v));
 }
 `;
 
+export const NIGHT = { value: 0 }; // 0 = day, 1 = night (shared by every building material)
+
 export function makeFacadeMaterial(opts = {}) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, ...opts });
   m.onBeforeCompile = (sh) => {
+    sh.uniforms.uNight = NIGHT;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 aFac;\nattribute vec2 aFuv;\nvarying vec4 vFac;\nvarying vec2 vFuv;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFac = vec4(aFac.x, aFac.yzw / 20.0);\nvFuv = aFuv;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\n' + GLSL)
       .replace('#include <color_fragment>', '#include <color_fragment>\nfacadeShade(diffuseColor.rgb);')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += facGlass * vec3(0.10, 0.13, 0.17);');
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += facGlass * vec3(0.10, 0.13, 0.17) + facLit * uNight * mix(vec3(1.0, 0.72, 0.38), vec3(0.85, 0.9, 1.0), step(0.8, fHash(vec2(vFuv.x, vFuv.y * 0.1)))) * 1.1;');
   };
-  m.customProgramCacheKey = () => 'facade-v1';
+  m.customProgramCacheKey = () => 'facade-v2';
   return m;
 }
